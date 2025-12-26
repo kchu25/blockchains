@@ -5,3 +5,4 @@
 ~~~
 
 - [solidity](tag/solidity)
+- [dao](tag/dao)
