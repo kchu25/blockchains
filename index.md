@@ -6,3 +6,4 @@
 
 - [solidity](tag/solidity)
 - [dao](tag/dao)
+- [distributed-systems](tag/distributed-systems)
