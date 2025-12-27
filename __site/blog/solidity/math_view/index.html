@@ -210,13 +210,100 @@
 </ul>
 <p><strong>TL;DR:</strong> Blockchain &#61; append-only log of transactions &#43; current state. Old states aren&#39;t saved—they&#39;re reconstructed by replaying the transaction tape from the beginning.</p>
 </blockquote>
+<blockquote>
+<p><strong>Mathematical description: Why this saves massive space</strong></p>
+<p><strong>What the blockchain actually stores:</strong></p>
+</blockquote>
+\[\text{Blockchain} = \{s_{\text{current}}\} \cup \{f_1, f_2, f_3, \ldots, f_n\}\]
+<blockquote>
+<p>where:</p>
+<ul>
+<li><p>\(s_{\text{current}}\) &#61; current state &#40;ONE snapshot&#41;</p>
+</li>
+<li><p>\(f_1, f_2, \ldots, f_n\) &#61; sequence of functions applied &#40;transactions&#41;</p>
+</li>
+</ul>
+<p><strong>To get historical state at block \(k\):</strong></p>
+</blockquote>
+\[s_k = f_k \circ f_{k-1} \circ \cdots \circ f_2 \circ f_1(s_0)\]
+<blockquote>
+<p>&#40;Apply functions 1 through \(k\) to the genesis state \(s_0\)&#41;</p>
+<p><strong>Space comparison:</strong></p>
+<table><tr><th align="right">Storage Method</th><th align="right">Space Required</th><th align="right">Formula</th></tr><tr><td align="right"><strong>Naive &#40;store all states&#41;</strong></td><td align="right">Huge</td><td align="right">\(O(n \cdot \|S\|)\) where \(n\) &#61; blocks, \(\|S\|\) &#61; state size</td></tr><tr><td align="right"><strong>Blockchain &#40;store transitions&#41;</strong></td><td align="right">Small</td><td align="right">\(O(\|S\| + n \cdot \|f\|)\) where \(\|f\|\) &#61; transaction size</td></tr></table>
+<p><strong>Why it&#39;s efficient:</strong></p>
+<ul>
+<li><p>States are BIG &#40;millions of variables across all contracts&#41;</p>
+</li>
+<li><p>Transactions are SMALL &#40;just the changes: &quot;set balance&#91;Alice&#93; &#61; 70&quot;&#41;</p>
+</li>
+<li><p>\(\|f\| \ll \|S\|\) &#40;transaction size ≪ full state size&#41;</p>
+</li>
+</ul>
+<p><strong>Concrete example:</strong></p>
+<ul>
+<li><p>Full Ethereum state: ~100 GB</p>
+</li>
+<li><p>Average transaction: ~100 bytes</p>
+</li>
+<li><p>Blocks per day: ~7,000</p>
+</li>
+</ul>
+<p>Storing all states: \(7000 \times 100\text{ GB} = 700\text{ TB/day}\) 🤯</p>
+<p>Storing transactions: \(7000 \times 100\text{ bytes} \approx 0.7\text{ MB/day}\) ✅</p>
+<p><strong>The mathematical trick:</strong> Instead of storing \(s_1, s_2, s_3, \ldots\), store \(s_0\) and \(\Delta_1, \Delta_2, \Delta_3, \ldots\) &#40;the deltas/changes&#41;. To reconstruct any \(s_k\), apply the deltas.</p>
+<p>This is essentially <strong>event sourcing</strong> or <strong>delta encoding</strong>—a fundamental compression technique where you store operations instead of snapshots.</p>
+</blockquote>
+<blockquote>
+<p><strong>But if there are millions of contracts &#40;buildings&#41;, doesn&#39;t the blockchain &#40;city&#41; run out of space?</strong></p>
+<p><strong>Short answer: YES, it&#39;s already a huge problem&#33;</strong></p>
+<p>The blockchain DOES grow forever, and it IS hitting capacity limits. Here&#39;s the reality:</p>
+<p><strong>Current Ethereum stats &#40;as of 2024&#41;:</strong></p>
+<ul>
+<li><p>Full blockchain history: ~1&#43; TB &#40;all blocks and transactions ever&#41;</p>
+</li>
+<li><p>Current state: ~100-200 GB &#40;all contracts&#39; current variables&#41;</p>
+</li>
+<li><p>Growth rate: ~50-100 GB per year</p>
+</li>
+</ul>
+<p><strong>The capacity constraints:</strong></p>
+</blockquote>
+\[\text{Transactions per block} \leq \frac{G_{\text{block limit}}}{\text{avg gas per tx}}\]
+<blockquote>
+<p>Ethereum&#39;s block gas limit ≈ 30 million gas → only ~300-500 transactions per block</p>
+<p>With blocks every 12 seconds → only ~30-40 transactions per second max</p>
+<p>Compare to Visa: ~65,000 transactions per second. The blockchain can&#39;t keep up&#33;</p>
+<p><strong>Why it hasn&#39;t exploded yet:</strong></p>
+<ol>
+<li><p><strong>Gas fees act as a throttle</strong>: When demand is high, fees spike to \(50-\)100 per transaction, which prices out most users. It&#39;s economic rationing.</p>
+</li>
+<li><p><strong>Not everyone runs full nodes</strong>: Most people use &quot;light clients&quot; that only verify headers, not store everything. Only ~10,000 full nodes worldwide store the complete state.</p>
+</li>
+<li><p><strong>Layer 2 solutions</strong>: Networks like Arbitrum and Optimism batch thousands of transactions off-chain and only write summaries to Ethereum. This is like building &quot;apartment buildings&quot; &#40;L2s&#41; that share one &quot;foundation&quot; &#40;L1&#41;.</p>
+</li>
+<li><p><strong>State pruning</strong>: Some nodes delete old state and only keep recent data &#43; transaction history &#40;so they can reconstruct if needed&#41;.</p>
+</li>
+</ol>
+<p><strong>The scalability trilemma:</strong></p>
+<p>You can only pick 2 of 3:</p>
+<ul>
+<li><p><strong>Decentralization</strong> &#40;many nodes can participate&#41;</p>
+</li>
+<li><p><strong>Security</strong> &#40;hard to attack&#41;</p>
+</li>
+<li><p><strong>Scalability</strong> &#40;high throughput&#41;</p>
+</li>
+</ul>
+<p>Ethereum chose decentralization &#43; security → sacrificed scalability. If blocks were bigger, only supercomputers could run nodes, killing decentralization.</p>
+<p><strong>TL;DR:</strong> Yes, the blockchain is hitting capacity&#33; Solutions: charge more &#40;gas fees&#41;, move stuff off-chain &#40;Layer 2&#41;, or accept that not everyone stores everything &#40;light clients&#41;. There&#39;s no free lunch—storage is finite.</p>
+</blockquote>
 <p>Your contract&#39;s state is just a tuple of typed values:</p>
-\(S = V_1 \times V_2 \times \cdots \times V_n\)
+\[S = V_1 \times V_2 \times \cdots \times V_n\]
 <p><strong>Example:</strong> A simple token contract</p>
 <pre><code class="language-julia">uint256 totalSupply;           // V₁ ∈ &#91;0, 2²⁵⁶-1&#93;
 mapping&#40;address &#61;&gt; uint256&#41;;   // V₂: Address → &#91;0, 2²⁵⁶-1&#93;</code></pre>
 <p>becomes:</p>
-\(S = \mathbb{Z}_{2^{256}} \times (A \to \mathbb{Z}_{2^{256}})\)
+\[S = \mathbb{Z}_{2^{256}} \times (A \to \mathbb{Z}_{2^{256}})\]
 <p>where \(A\) is the set of all Ethereum addresses &#40;20-byte values&#41;.</p>
 <p><strong>Intuition:</strong> State is just &quot;all the variables that persist between function calls.&quot; Mathematically, it&#39;s a product space of typed domains.</p>
 <hr />
