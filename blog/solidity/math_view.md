@@ -57,7 +57,7 @@
 > - Think: the game is over, but the save file still exists. You just can't press any meaningful buttons anymore.
 >
 > Mathematically: you reach a state $s_{\text{terminal}}$ where all remaining functions become no-ops or revert:
-> $\forall f \in F: f(s_{\text{terminal}}, \cdot) = s_{\text{terminal}} \text{ or } \text{revert}$
+> $$\forall f \in F: f(s_{\text{terminal}}, \cdot) = s_{\text{terminal}} \text{ or } \text{revert}$$
 >
 > **Option 2: Self-destruct** (true annihilation)
 > - Use `selfdestruct(recipient)` → contract code is erased, remaining ETH sent to recipient
@@ -89,9 +89,56 @@ where:
 
 ## 1. State Space $S$
 
+> **Wait, what exactly IS "the state"? Is it the blockchain itself?**
+>
+> Let me clarify with a crucial distinction: **the blockchain records CHANGES, but only stores the CURRENT state**.
+>
+> **Here's what actually gets recorded on the blockchain:**
+>
+> **Every block permanently stores:**
+> 1. **Transactions** (the instructions: "Alice called transfer(Bob, 50)")
+> 2. **Event logs** (notifications: "Transfer happened from Alice to Bob")
+> 3. **State root hash** (a cryptographic fingerprint of ALL current states at that moment)
+>
+> **What's NOT stored in every block:**
+> - The complete history of every variable's value over time
+> 
+> **Think of it like Git commits:**
+> - Each block is like a commit that says "here's what changed" (the transaction)
+> - The blockchain keeps the CURRENT state (like your working directory)
+> - To see historical states, you replay all transactions from genesis (like checking out an old commit)
+>
+> **Concrete example:**
+>
+> Your contract has `balance[Alice] = 100`
+>
+> | Block | Transaction | State After | What's Stored |
+> |-------|-------------|-------------|---------------|
+> | 1000 | Alice sends 30 to Bob | `balance[Alice] = 70` | ✅ Transaction "transfer(Bob, 30)" <br> ✅ Event "Transfer(Alice, Bob, 30)" <br> ✅ State root (hash of current state) <br> ❌ Old value "100" is gone! |
+> | 1001 | Bob sends 10 to Carol | `balance[Alice] = 70` (unchanged) | ✅ Transaction "transfer(Carol, 10)" <br> ✅ Current state still available |
+>
+> **The blockchain stores:**
+> - ✅ CURRENT state (Alice has 70, Bob has 20, Carol has 10)
+> - ✅ ALL transactions (the history of what changed)
+> - ✅ State root hashes (proof that states were correct at each block)
+>
+> **The blockchain does NOT store:**
+> - ❌ Every historical value (that Alice once had 100)
+> - ❌ Snapshots of complete state at every block
+>
+> **To get historical state, you must:**
+> Replay all transactions from the beginning (expensive!). This is why services like Etherscan exist—they do this replay and index everything for you.
+>
+> **So when we say "state is on the blockchain":**
+> - The **current state** lives on every node (mutable, gets overwritten)
+> - The **transaction history** lives in blocks (immutable, permanent)
+> - Historical states can be reconstructed by replaying transactions
+>
+> **TL;DR:** Blockchain = append-only log of transactions + current state. Old states aren't saved—they're reconstructed by replaying the transaction tape from the beginning.
+
 Your contract's state is just a tuple of typed values:
 
-$$S = V_1 \times V_2 \times \cdots \times V_n$$
+$S = V_1 \times V_2 \times \cdots \times V_n$
 
 **Example:** A simple token contract
 ```
@@ -101,7 +148,7 @@ mapping(address => uint256);   // V₂: Address → [0, 2²⁵⁶-1]
 
 becomes:
 
-$$S = \mathbb{Z}_{2^{256}} \times (A \to \mathbb{Z}_{2^{256}})$$
+$S = \mathbb{Z}_{2^{256}} \times (A \to \mathbb{Z}_{2^{256}})$
 
 where $A$ is the set of all Ethereum addresses (20-byte values).
 
@@ -119,6 +166,70 @@ where:
 - $I$ = function inputs (parameters)
 - $C$ = context (msg.sender, msg.value, block.timestamp, etc.)
 - $\rightharpoonup$ means "partial function" (can fail/revert)
+
+> **What the heck is `msg`?**
+>
+> `msg` is short for **message**—as in, the transaction message that called your function. Think of it like an envelope that arrives at your contract's door. The envelope contains:
+> - Who sent it (`msg.sender`)
+> - How much money they included (`msg.value`)
+> - What they want you to do (the function call itself)
+>
+> **Why "message"?** Because in blockchain terminology, every transaction is literally a "message" being passed between accounts. When you call a function, you're sending a message to the contract.
+>
+> Here's what `msg` and state `s` contain:
+>
+> | **`msg` (the envelope)** | **What it is** | **Type** |
+> |--------------------------|----------------|----------|
+> | `msg.sender` | Who called this function | `address` |
+> | `msg.value` | How much ETH they sent (in wei) | `uint256` |
+> | `msg.data` | Raw bytes of the function call | `bytes` |
+> | `msg.sig` | First 4 bytes of `msg.data` (function selector) | `bytes4` |
+>
+> | **`block` (the context)** | **What it is** | **Type** |
+> |---------------------------|----------------|----------|
+> | `block.timestamp` | When this block was mined (Unix time) | `uint256` |
+> | `block.number` | Current block height | `uint256` |
+> | `block.coinbase` | Address of miner who mined this block | `address` |
+>
+> | **State `s` (your variables)** | **What it is** | **Example** |
+> |-------------------------------|----------------|-------------|
+> | Storage variables | Stuff you declared in the contract | `uint256 balance` |
+> | Mappings | Your hash tables | `mapping(address => uint)` |
+> | Arrays | Your lists | `address[] users` |
+>
+> **Key insight:** 
+> - **`msg` = temporary info about THIS transaction** (who's knocking, what they brought)
+> - **`s` = permanent data that survives between transactions** (the contract's memory)
+>
+> Every function gets both: the state it's modifying (`s`) and the context of who's doing it (`msg`). That's why functions need both to make decisions—you need to know "what's in the database" AND "who's asking to change it."
+
+> **What does `require()` actually do?**
+>
+> `require()` is **NOT** like `@assert` in Julia. It's way more aggressive.
+>
+> In Julia, if an assertion fails, you get an error but the program might continue depending on how you handle it. In Solidity, `require()` is a **hard stop that nukes the entire transaction**:
+>
+> ```solidity
+> function transfer(address to, uint256 amount) public {
+>     require(balance[msg.sender] >= amount, "Not enough balance");
+>     balance[msg.sender] -= amount;  // ← This NEVER runs if require fails
+>     balance[to] += amount;          // ← This NEVER runs if require fails
+> }
+> ```
+>
+> **What happens if `require()` fails:**
+> 1. **Execution stops immediately** (doesn't continue to lines below)
+> 2. **All state changes are reverted** (like they never happened)
+> 3. **Gas used so far is NOT refunded** (you paid for the computation up to the failure)
+> 4. **An error message is returned** (the string you provided)
+>
+> **Think of it like this:**
+> - Julia's `@assert`: "Hey, something's wrong, let me tell you"
+> - Solidity's `require()`: "STOP EVERYTHING. Undo all changes. This transaction never happened."
+>
+> **Why so extreme?** Because blockchain transactions are atomic—either everything succeeds or nothing does. No partial states. If you try to transfer more than you have, the blockchain can't be left in a "half-transferred" state. It's all-or-nothing.
+>
+> Mathematically, it makes functions **partial** (the $\rightharpoonup$ symbol above): they only produce output for valid inputs, otherwise they're undefined (revert).
 
 **Example:** Transfer function
 ```solidity
@@ -150,7 +261,7 @@ where:
 > Think of it like a bouncer at a club. You walk up with your ID (your address) and some info (how much money you have, what time it is). The bouncer checks a simple rule and decides: let you in (true) or kick you out (false).
 > 
 > Mathematically, it's a function:
-> $\tau: \text{Context} \to \{\text{true}, \text{false}\}$
+> $$\tau: \text{Context} \to \{\text{true}, \text{false}\}$$
 > 
 > **Context** = everything about this moment:
 > - Who's calling? (`msg.sender`)

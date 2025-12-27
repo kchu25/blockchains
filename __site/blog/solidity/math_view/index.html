@@ -107,7 +107,10 @@
 <li><p>Think: the game is over, but the save file still exists. You just can&#39;t press any meaningful buttons anymore.</p>
 </li>
 </ul>
-<p>Mathematically: you reach a state \(s_{\text{terminal}}\) where all remaining functions become no-ops or revert: \(\forall f \in F: f(s_{\text{terminal}}, \cdot) = s_{\text{terminal}} \text{ or } \text{revert}\)</p>
+<p>Mathematically: you reach a state \(s_{\text{terminal}}\) where all remaining functions become no-ops or revert:</p>
+</blockquote>
+\[\forall f \in F: f(s_{\text{terminal}}, \cdot) = s_{\text{terminal}} \text{ or } \text{revert}\]
+<blockquote>
 <p><strong>Option 2: Self-destruct</strong> &#40;true annihilation&#41;</p>
 <ul>
 <li><p>Use <code>selfdestruct&#40;recipient&#41;</code> → contract code is erased, remaining ETH sent to recipient</p>
@@ -149,13 +152,71 @@
 </li>
 </ol>
 </a></h2>
+<blockquote>
+<p><strong>Wait, what exactly IS &quot;the state&quot;? Is it the blockchain itself?</strong></p>
+<p>Let me clarify with a crucial distinction: <strong>the blockchain records CHANGES, but only stores the CURRENT state</strong>.</p>
+<p><strong>Here&#39;s what actually gets recorded on the blockchain:</strong></p>
+<p><strong>Every block permanently stores:</strong></p>
+<ol>
+<li><p><strong>Transactions</strong> &#40;the instructions: &quot;Alice called transfer&#40;Bob, 50&#41;&quot;&#41;</p>
+</li>
+<li><p><strong>Event logs</strong> &#40;notifications: &quot;Transfer happened from Alice to Bob&quot;&#41;</p>
+</li>
+<li><p><strong>State root hash</strong> &#40;a cryptographic fingerprint of ALL current states at that moment&#41;</p>
+</li>
+</ol>
+<p><strong>What&#39;s NOT stored in every block:</strong></p>
+<ul>
+<li><p>The complete history of every variable&#39;s value over time</p>
+</li>
+</ul>
+<p><strong>Think of it like Git commits:</strong></p>
+<ul>
+<li><p>Each block is like a commit that says &quot;here&#39;s what changed&quot; &#40;the transaction&#41;</p>
+</li>
+<li><p>The blockchain keeps the CURRENT state &#40;like your working directory&#41;</p>
+</li>
+<li><p>To see historical states, you replay all transactions from genesis &#40;like checking out an old commit&#41;</p>
+</li>
+</ul>
+<p><strong>Concrete example:</strong></p>
+<p>Your contract has <code>balance&#91;Alice&#93; &#61; 100</code></p>
+<table><tr><th align="right">Block</th><th align="right">Transaction</th><th align="right">State After</th><th align="right">What&#39;s Stored</th></tr><tr><td align="right">1000</td><td align="right">Alice sends 30 to Bob</td><td align="right"><code>balance&#91;Alice&#93; &#61; 70</code></td><td align="right">✅ Transaction &quot;transfer&#40;Bob, 30&#41;&quot; &lt;br&gt; ✅ Event &quot;Transfer&#40;Alice, Bob, 30&#41;&quot; &lt;br&gt; ✅ State root &#40;hash of current state&#41; &lt;br&gt; ❌ Old value &quot;100&quot; is gone&#33;</td></tr><tr><td align="right">1001</td><td align="right">Bob sends 10 to Carol</td><td align="right"><code>balance&#91;Alice&#93; &#61; 70</code> &#40;unchanged&#41;</td><td align="right">✅ Transaction &quot;transfer&#40;Carol, 10&#41;&quot; &lt;br&gt; ✅ Current state still available</td></tr></table>
+<p><strong>The blockchain stores:</strong></p>
+<ul>
+<li><p>✅ CURRENT state &#40;Alice has 70, Bob has 20, Carol has 10&#41;</p>
+</li>
+<li><p>✅ ALL transactions &#40;the history of what changed&#41;</p>
+</li>
+<li><p>✅ State root hashes &#40;proof that states were correct at each block&#41;</p>
+</li>
+</ul>
+<p><strong>The blockchain does NOT store:</strong></p>
+<ul>
+<li><p>❌ Every historical value &#40;that Alice once had 100&#41;</p>
+</li>
+<li><p>❌ Snapshots of complete state at every block</p>
+</li>
+</ul>
+<p><strong>To get historical state, you must:</strong> Replay all transactions from the beginning &#40;expensive&#33;&#41;. This is why services like Etherscan exist—they do this replay and index everything for you.</p>
+<p><strong>So when we say &quot;state is on the blockchain&quot;:</strong></p>
+<ul>
+<li><p>The <strong>current state</strong> lives on every node &#40;mutable, gets overwritten&#41;</p>
+</li>
+<li><p>The <strong>transaction history</strong> lives in blocks &#40;immutable, permanent&#41;</p>
+</li>
+<li><p>Historical states can be reconstructed by replaying transactions</p>
+</li>
+</ul>
+<p><strong>TL;DR:</strong> Blockchain &#61; append-only log of transactions &#43; current state. Old states aren&#39;t saved—they&#39;re reconstructed by replaying the transaction tape from the beginning.</p>
+</blockquote>
 <p>Your contract&#39;s state is just a tuple of typed values:</p>
-\[S = V_1 \times V_2 \times \cdots \times V_n\]
+\(S = V_1 \times V_2 \times \cdots \times V_n\)
 <p><strong>Example:</strong> A simple token contract</p>
 <pre><code class="language-julia">uint256 totalSupply;           // V₁ ∈ &#91;0, 2²⁵⁶-1&#93;
 mapping&#40;address &#61;&gt; uint256&#41;;   // V₂: Address → &#91;0, 2²⁵⁶-1&#93;</code></pre>
 <p>becomes:</p>
-\[S = \mathbb{Z}_{2^{256}} \times (A \to \mathbb{Z}_{2^{256}})\]
+\(S = \mathbb{Z}_{2^{256}} \times (A \to \mathbb{Z}_{2^{256}})\)
 <p>where \(A\) is the set of all Ethereum addresses &#40;20-byte values&#41;.</p>
 <p><strong>Intuition:</strong> State is just &quot;all the variables that persist between function calls.&quot; Mathematically, it&#39;s a product space of typed domains.</p>
 <hr />
@@ -175,6 +236,64 @@ mapping&#40;address &#61;&gt; uint256&#41;;   // V₂: Address → &#91;0, 2²�
 <li><p>\(\rightharpoonup\) means &quot;partial function&quot; &#40;can fail/revert&#41;</p>
 </li>
 </ul>
+<blockquote>
+<p><strong>What the heck is <code>msg</code>?</strong></p>
+<p><code>msg</code> is short for <strong>message</strong>—as in, the transaction message that called your function. Think of it like an envelope that arrives at your contract&#39;s door. The envelope contains:</p>
+<ul>
+<li><p>Who sent it &#40;<code>msg.sender</code>&#41;</p>
+</li>
+<li><p>How much money they included &#40;<code>msg.value</code>&#41;</p>
+</li>
+<li><p>What they want you to do &#40;the function call itself&#41;</p>
+</li>
+</ul>
+<p><strong>Why &quot;message&quot;?</strong> Because in blockchain terminology, every transaction is literally a &quot;message&quot; being passed between accounts. When you call a function, you&#39;re sending a message to the contract.</p>
+<p>Here&#39;s what <code>msg</code> and state <code>s</code> contain:</p>
+<table><tr><th align="right"><strong><code>msg</code> &#40;the envelope&#41;</strong></th><th align="right"><strong>What it is</strong></th><th align="right"><strong>Type</strong></th></tr><tr><td align="right"><code>msg.sender</code></td><td align="right">Who called this function</td><td align="right"><code>address</code></td></tr><tr><td align="right"><code>msg.value</code></td><td align="right">How much ETH they sent &#40;in wei&#41;</td><td align="right"><code>uint256</code></td></tr><tr><td align="right"><code>msg.data</code></td><td align="right">Raw bytes of the function call</td><td align="right"><code>bytes</code></td></tr><tr><td align="right"><code>msg.sig</code></td><td align="right">First 4 bytes of <code>msg.data</code> &#40;function selector&#41;</td><td align="right"><code>bytes4</code></td></tr></table>
+<table><tr><th align="right"><strong><code>block</code> &#40;the context&#41;</strong></th><th align="right"><strong>What it is</strong></th><th align="right"><strong>Type</strong></th></tr><tr><td align="right"><code>block.timestamp</code></td><td align="right">When this block was mined &#40;Unix time&#41;</td><td align="right"><code>uint256</code></td></tr><tr><td align="right"><code>block.number</code></td><td align="right">Current block height</td><td align="right"><code>uint256</code></td></tr><tr><td align="right"><code>block.coinbase</code></td><td align="right">Address of miner who mined this block</td><td align="right"><code>address</code></td></tr></table>
+<table><tr><th align="right"><strong>State <code>s</code> &#40;your variables&#41;</strong></th><th align="right"><strong>What it is</strong></th><th align="right"><strong>Example</strong></th></tr><tr><td align="right">Storage variables</td><td align="right">Stuff you declared in the contract</td><td align="right"><code>uint256 balance</code></td></tr><tr><td align="right">Mappings</td><td align="right">Your hash tables</td><td align="right"><code>mapping&#40;address &#61;&gt; uint&#41;</code></td></tr><tr><td align="right">Arrays</td><td align="right">Your lists</td><td align="right"><code>address&#91;&#93; users</code></td></tr></table>
+<p><strong>Key insight:</strong> </p>
+<ul>
+<li><p><strong><code>msg</code> &#61; temporary info about THIS transaction</strong> &#40;who&#39;s knocking, what they brought&#41;</p>
+</li>
+<li><p><strong><code>s</code> &#61; permanent data that survives between transactions</strong> &#40;the contract&#39;s memory&#41;</p>
+</li>
+</ul>
+<p>Every function gets both: the state it&#39;s modifying &#40;<code>s</code>&#41; and the context of who&#39;s doing it &#40;<code>msg</code>&#41;. That&#39;s why functions need both to make decisions—you need to know &quot;what&#39;s in the database&quot; AND &quot;who&#39;s asking to change it.&quot;</p>
+</blockquote>
+<blockquote>
+<p><strong>What does <code>require&#40;&#41;</code> actually do?</strong></p>
+<p><code>require&#40;&#41;</code> is <strong>NOT</strong> like <code>@assert</code> in Julia. It&#39;s way more aggressive.</p>
+<p>In Julia, if an assertion fails, you get an error but the program might continue depending on how you handle it. In Solidity, <code>require&#40;&#41;</code> is a <strong>hard stop that nukes the entire transaction</strong>:</p>
+</blockquote>
+<pre><code class="language-solidity">&gt; function transfer&#40;address to, uint256 amount&#41; public &#123;
+&gt;     require&#40;balance&#91;msg.sender&#93; &gt;&#61; amount, &quot;Not enough balance&quot;&#41;;
+&gt;     balance&#91;msg.sender&#93; -&#61; amount;  // ← This NEVER runs if require fails
+&gt;     balance&#91;to&#93; &#43;&#61; amount;          // ← This NEVER runs if require fails
+&gt; &#125;
+&gt;</code></pre>
+<blockquote>
+<p><strong>What happens if <code>require&#40;&#41;</code> fails:</strong></p>
+<ol>
+<li><p><strong>Execution stops immediately</strong> &#40;doesn&#39;t continue to lines below&#41;</p>
+</li>
+<li><p><strong>All state changes are reverted</strong> &#40;like they never happened&#41;</p>
+</li>
+<li><p><strong>Gas used so far is NOT refunded</strong> &#40;you paid for the computation up to the failure&#41;</p>
+</li>
+<li><p><strong>An error message is returned</strong> &#40;the string you provided&#41;</p>
+</li>
+</ol>
+<p><strong>Think of it like this:</strong></p>
+<ul>
+<li><p>Julia&#39;s <code>@assert</code>: &quot;Hey, something&#39;s wrong, let me tell you&quot;</p>
+</li>
+<li><p>Solidity&#39;s <code>require&#40;&#41;</code>: &quot;STOP EVERYTHING. Undo all changes. This transaction never happened.&quot;</p>
+</li>
+</ul>
+<p><strong>Why so extreme?</strong> Because blockchain transactions are atomic—either everything succeeds or nothing does. No partial states. If you try to transfer more than you have, the blockchain can&#39;t be left in a &quot;half-transferred&quot; state. It&#39;s all-or-nothing.</p>
+<p>Mathematically, it makes functions <strong>partial</strong> &#40;the \(\rightharpoonup\) symbol above&#41;: they only produce output for valid inputs, otherwise they&#39;re undefined &#40;revert&#41;.</p>
+</blockquote>
 <p><strong>Example:</strong> Transfer function</p>
 <pre><code class="language-solidity">function transfer&#40;address to, uint256 amount&#41; public &#123;
     require&#40;balances&#91;msg.sender&#93; &gt;&#61; amount&#41;;
@@ -206,7 +325,10 @@ mapping&#40;address &#61;&gt; uint256&#41;;   // V₂: Address → &#91;0, 2²�
 <blockquote>
 <p><strong>Access control is just a yes/no gate: &quot;Can you come in?&quot;</strong></p>
 <p>Think of it like a bouncer at a club. You walk up with your ID &#40;your address&#41; and some info &#40;how much money you have, what time it is&#41;. The bouncer checks a simple rule and decides: let you in &#40;true&#41; or kick you out &#40;false&#41;.</p>
-<p>Mathematically, it&#39;s a function: \(\tau: \text{Context} \to \{\text{true}, \text{false}\}\)</p>
+<p>Mathematically, it&#39;s a function:</p>
+</blockquote>
+\[\tau: \text{Context} \to \{\text{true}, \text{false}\}\]
+<blockquote>
 <p><strong>Context</strong> &#61; everything about this moment:</p>
 <ul>
 <li><p>Who&#39;s calling? &#40;<code>msg.sender</code>&#41;</p>
