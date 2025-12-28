@@ -1,5 +1,5 @@
 @def title = "Solidity Functions & Mappings: A Practical Guide"
-@def published = "27 December 2025"
+@def published = "28 December 2025"
 @def tags = ["solidity"]
 
 # Solidity Functions & Mappings: A Practical Guide
