@@ -1,5 +1,5 @@
 @def title = "Your First Solidity Smart Contract: A Simple Lending Protocol"
-@def published = "26 December 2025"
+@def published = "27 December 2025"
 @def tags = ["solidity"]
 
 # Your First Solidity Smart Contract: A Simple Lending Protocol
