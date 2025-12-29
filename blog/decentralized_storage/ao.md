@@ -82,7 +82,7 @@ Yes, they're absolutely competitors. Both are trying to build "the decentralized
 | **State Management** | Holographic (replay from message logs) | Explicit state storage |
 | **Finality Time** | ~30 minutes (Arweave confirmation) | Seconds |
 | **Maturity** | Brand new (Feb 2025) | Established (2021) |
-| **Market Cap** | ~$233M (AR token) | ~$4B+ (ICP token) |
+| **Market Cap** | ~\$233M (AR token) | ~\$4B+ (ICP token) |
 
 ### The Actual Competitive Landscape
 
@@ -120,7 +120,7 @@ Sam Williams seems genuinely focused on building rather than trash-talking compe
 ## Is AO Actually Real or Just Vaporware?
 
 **It's real.** Mainnet launched, tokens exist, apps are being built. Here's the proof:
-- $700M+ in assets bridged to testnet before launch
+- \$700M+ in assets bridged to testnet before launch
 - 100+ projects building on it
 - Live protocols like ANyONe (privacy-focused messaging) already running
 - Native AO token launched with 21M max supply (Bitcoin-style economics)
@@ -135,7 +135,7 @@ Sam Williams seems genuinely focused on building rather than trash-talking compe
 
 ### How Traditional Blockchains Work (The Problem):
 - Ethereum: You pay gas for every transaction, every smart contract execution
-- High demand = gas fees spike (sometimes $50+ per transaction)
+- High demand = gas fees spike (sometimes \$50+ per transaction)
 - This kills user experience for games, social apps, anything interactive
 
 ### How AO Works (The Solution):
@@ -260,7 +260,7 @@ Confusingly, there are TWO tokens here:
 - Original Arweave token
 - Used to pay for permanent storage
 - Been around since 2018
-- Current price: ~$15-20 (as of late 2025, down from $40 peak)
+- Current price: ~\$15-20 (as of late 2025, down from \$40 peak)
 
 ### AO Token (new)
 - Launched with AO mainnet in Feb 2025
@@ -414,7 +414,7 @@ If you want to participate in the Arweave ecosystem with LESS risk, gateway oper
 
 Before diving into AO node operation, answer these honestly:
 
-1. **Do I have $5K-20K to risk?** (Hardware + electricity for a year)
+1. **Do I have \$5K-20K to risk?** (Hardware + electricity for a year)
 2. **Am I technically skilled enough to debug node issues?** (This isn't plug-and-play)
 3. **Can I wait 1-2 years for the market to develop?** (Early infrastructure rarely pays off immediately)
 4. **Do I believe AO will become major infrastructure?** (If not, why bother?)
