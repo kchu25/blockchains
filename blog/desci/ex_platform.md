@@ -10,7 +10,7 @@
 
 ## The State of DeSci: Why It's Not Working
 
-**BIO Protocol just launched** (Jan 3, 2025) with Binance backing. VitaDAO has funded $10M+ in research since 2021. Market caps look impressive in crypto terms.
+**BIO Protocol just launched** (Jan 3, 2025) with Binance backing. VitaDAO has funded 10M+ in research since 2021. Market caps look impressive in crypto terms.
 
 **But here's the problem:** You've never heard of them. Neither have 99% of scientists.
 
@@ -104,19 +104,19 @@ Pick ONE biology domain and go deep:
 - Target: At-home aging biomarker experiments (blood panels, wearable data, cognitive tests)
 - Users: Biohackers, citizen scientists, longevity enthusiasts
 - Advantage: This audience already understands crypto and is willing to self-experiment
-- Concrete offering: "Track your biological age monthly. Get paid $50 per data submission. See how interventions affect your aging markers."
+- Concrete offering: "Track your biological age monthly. Get paid \$50 per data submission. See how interventions affect your aging markers."
 
 **Example: Replication Crisis Platform**
 - Target: Psychology/social science replication studies
 - Users: Academic labs needing quick replication funding, graduate students looking for projects
 - Advantage: Clear problem (60%+ of studies don't replicate), measurable impact
-- Concrete offering: "Pick a famous study to replicate. Get $2,000 funding. Publish results regardless of outcome."
+- Concrete offering: "Pick a famous study to replicate. Get \$2,000 funding. Publish results regardless of outcome."
 
 **Example: Microbiome Studies**
 - Target: Gut microbiome interventions with n-of-1 trials
 - Users: Health-conscious consumers, IBS/IBD patients seeking alternatives
 - Advantage: Easy to participate (stool samples, diet logs), clear metrics (microbiome diversity scores)
-- Concrete offering: "Test how probiotics affect YOUR gut. Submit 3 samples over 6 weeks. Earn $200 + personalized results."
+- Concrete offering: "Test how probiotics affect YOUR gut. Submit 3 samples over 6 weeks. Earn \$200 + personalized results."
 
 **Why vertical works:**
 - Solve one problem really well

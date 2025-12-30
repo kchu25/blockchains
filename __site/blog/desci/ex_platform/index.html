@@ -46,101 +46,8 @@
 <p><strong>TL;DR:</strong> Decentralized Science &#40;DeSci&#41; has raised millions but failed to attract scientists because of terrible UX. The opportunity isn&#39;t building &quot;another blockchain&quot;—it&#39;s building the abstraction layer that hides blockchain complexity while keeping its benefits &#40;transparent funding, automatic attribution, immutable protocols&#41;. This guide covers the technical architecture, reward mechanisms, implementation roadmap, and common pitfalls.</p>
 <hr />
 <h2 id="the_state_of_desci_why_its_not_working"><a href="#the_state_of_desci_why_its_not_working" class="header-anchor">The State of DeSci: Why It&#39;s Not Working</a></h2>
-<p><strong>BIO Protocol just launched</strong> &#40;Jan 3, 2025&#41; with Binance backing. VitaDAO has funded \(10M+ in research since 2021. Market caps look impressive in crypto terms.
-
-**But here's the problem:** You've never heard of them. Neither have 99% of scientists.
-
-### The Brutal Truth
-
-VitaDAO has 6+ bioDAOs, \$20M+ in treasuries, ecosystem market cap over \$200M. Sounds big? The NIA's 2023 budget for aging biology alone was ~\$400M—40x VitaDAO's *entire history*.
-
-**Why scientists don't use it:**
-
-1. Need to: buy crypto → install MetaMask → understand gas fees → navigate Discord → stake tokens → comprehend vesting schedules
-2. Scientists unfamiliar with Web3 find blockchain difficult to understand and use
-3. Traditional academia views DeSci with skepticism, needing proof beyond hype through projects with real impact
-4. No drugs in Phase 2 trials yet to prove the model works sustainably
-
-**The UX gap is enormous.** An NIH grant application is painful, but doesn't require learning about L2 rollups.
-
-## What You Should Actually Build
-
-Forget "another blockchain." The tech exists. What's missing is a bridge between crypto and scientists.
-
-### Direction 1: The Abstraction Layer (Recommended)
-
-**Build: "Stripe for DeSci"**
-
-The platform that makes blockchain invisible to scientists while keeping its benefits:
-
-**Core principle:** Scientists use email. Blockchain runs in the background.
-
-```
-Scientist experience:          Behind the scenes:
-─────────────────────         ─────────────────
-1. Sign in with email   →     Account abstraction wallet created
-2. Submit experiment    →     Protocol uploaded to Arweave  
-3. Get USD funding      →     Smart contract distributes tokens
-4. View results         →     Data pulled from IPFS
-5. Receive payment      →     Auto-converted to bank account
-```
-
-**Key features:**
-- **Fiat on/off ramps**: Credit card payments, ACH transfers, bank withdrawals
-- **Email-based identity**: No MetaMask, no seed phrases visible to users
-- **Dollar-denominated**: Show "\$5,000 reward pool" not "2.3 ETH"
-- **Social login**: Google/ORCID authentication
-- **Automatic compliance**: Tax forms, W-9s, institutional approvals handled
-
-**Tech stack:**
-- **Account Abstraction**: Biconomy or ZeroDev for gasless transactions
-- **Wallet abstraction**: Magic.link or Web3Auth (email → wallet)
-- **Fiat rails**: Stripe for onboarding, Coinbase Commerce or Circle for crypto conversion
-- **Backend**: Next.js with Privy for authentication
-- **Smart contracts**: Simple, audited contracts on Arbitrum
-- **Storage**: Arweave for protocols (abstracted via API)
-
-**The pitch to scientists:** "Submit experiments, get paid in dollars. That's it."
-
-### Direction 2: The Hybrid Model
-
-**Build: Traditional platform + blockchain backbone**
-
-Start as a normal web app, gradually reveal blockchain benefits:
-
-**Phase 1 (Months 1-6):** Pure Web2
-- Scientists use regular forms and dashboards
-- Store everything in PostgreSQL
-- Process payments via Stripe
-- Build user base, prove value
-
-**Phase 2 (Months 6-12):** Silent blockchain integration
-- Mirror critical data to blockchain
-- Issue "impact certificates" as NFTs (don't call them NFTs)
-- Enable "transparent funding" view (optional)
-
-**Phase 3 (Year 2+):** Optional crypto features
-- Let early adopters earn governance tokens
-- Enable peer-to-peer funding in crypto
-- Launch marketplace for experiment data
-
-**Why this works:**
-- No scary crypto UX to start
-- Blockchain provides verifiability without friction
-- Scientists can ignore crypto entirely if they want
-- Appeals to traditional institutions
-
-### Direction 3: Vertical Integration
-
-**Build: Experiment-specific platform, not general DeSci**
-
-Pick ONE biology domain and go deep:
-
-**Example: Longevity Experiments**
-- Target: At-home aging biomarker experiments (blood panels, wearable data, cognitive tests)
-- Users: Biohackers, citizen scientists, longevity enthusiasts
-- Advantage: This audience already understands crypto and is willing to self-experiment
-- Concrete offering: "Track your biological age monthly. Get paid \)</p>
+<p><strong>BIO Protocol just launched</strong> &#40;Jan 3, 2025&#41; with Binance backing. VitaDAO has funded 10M&#43; in research since 2021. Market caps look impressive in crypto terms.</p>
+<p><strong>But here&#39;s the problem:</strong> You&#39;ve never heard of them. Neither have 99&#37; of scientists.</p>
 <h3 id="the_brutal_truth"><a href="#the_brutal_truth" class="header-anchor">The Brutal Truth</a></h3>
 <p>VitaDAO has 6&#43; bioDAOs, &#36;20M&#43; in treasuries, ecosystem market cap over &#36;200M. Sounds big? The NIA&#39;s 2023 budget for aging biology alone was ~&#36;400M—40x VitaDAO&#39;s <em>entire history</em>.</p>
 <p><strong>Why scientists don&#39;t use it:</strong></p>
@@ -251,7 +158,7 @@ Pick ONE biology domain and go deep:
 </li>
 <li><p>Advantage: This audience already understands crypto and is willing to self-experiment</p>
 </li>
-<li><p>Concrete offering: &quot;Track your biological age monthly. Get paid 50 per data submission. See how interventions affect your aging markers.&quot;</p>
+<li><p>Concrete offering: &quot;Track your biological age monthly. Get paid &#36;50 per data submission. See how interventions affect your aging markers.&quot;</p>
 </li>
 </ul>
 <p><strong>Example: Replication Crisis Platform</strong></p>
@@ -262,13 +169,18 @@ Pick ONE biology domain and go deep:
 </li>
 <li><p>Advantage: Clear problem &#40;60&#37;&#43; of studies don&#39;t replicate&#41;, measurable impact</p>
 </li>
-<li><p>Concrete offering: &quot;Pick a famous study to replicate. Get \(2,000 funding. Publish results regardless of outcome."
-
-**Example: Microbiome Studies**
-- Target: Gut microbiome interventions with n-of-1 trials
-- Users: Health-conscious consumers, IBS/IBD patients seeking alternatives
-- Advantage: Easy to participate (stool samples, diet logs), clear metrics (microbiome diversity scores)
-- Concrete offering: "Test how probiotics affect YOUR gut. Submit 3 samples over 6 weeks. Earn \)200 &#43; personalized results.&quot;</p>
+<li><p>Concrete offering: &quot;Pick a famous study to replicate. Get &#36;2,000 funding. Publish results regardless of outcome.&quot;</p>
+</li>
+</ul>
+<p><strong>Example: Microbiome Studies</strong></p>
+<ul>
+<li><p>Target: Gut microbiome interventions with n-of-1 trials</p>
+</li>
+<li><p>Users: Health-conscious consumers, IBS/IBD patients seeking alternatives</p>
+</li>
+<li><p>Advantage: Easy to participate &#40;stool samples, diet logs&#41;, clear metrics &#40;microbiome diversity scores&#41;</p>
+</li>
+<li><p>Concrete offering: &quot;Test how probiotics affect YOUR gut. Submit 3 samples over 6 weeks. Earn &#36;200 &#43; personalized results.&quot;</p>
 </li>
 </ul>
 <p><strong>Why vertical works:</strong></p>
