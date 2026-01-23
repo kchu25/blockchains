@@ -1,4 +1,8 @@
 
+@def title = "BDeSci Platform Tech Stack - Your Friendly Roadmap"
+@def published = "30 December 2025"
+@def tags = ["desci"]
+
 # DeSci Platform Tech Stack - Your Friendly Roadmap 🧬
 
 Hey! So you want to build something meaningful in the DeSci space while keeping your day job. Here's the good news: **you don't need to learn everything at once**. Think of this as a "choose your own adventure" - start simple, add complexity only when you need it.

@@ -9,3 +9,4 @@
 - [distributed-systems](tag/distributed-systems)
 - [decentralized-storage](tag/decentralized-storage)
 - [desci](tag/desci)
+- [chainlink](tag/chainlink)
