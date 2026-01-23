@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@700;900&display=swap" rel="stylesheet">
+  <style>
+    @font-face {
+      font-family: 'BPdots';
+      src: url('/blockchains/assets/fonts/BPdots/BPdots.otf') format('opentype');
+      font-weight: normal;
+      font-style: normal;
+    }
+    @font-face {
+      font-family: 'BPdots';
+      src: url('/blockchains/assets/fonts/BPdots/BPdotsBold.otf') format('opentype');
+      font-weight: bold;
+      font-style: normal;
+    }
+  </style>
+  
+  
+  <link rel="stylesheet" href="/css/franklin.css">
+<link rel="stylesheet" href="/css/hypertext.css">
+<link rel="icon" href="/assets/favicon.png">
+
+   <title>Blockchain Jargon from the Chainlink Article</title>  
+</head>
+<body>
+<header>
+  <h1 style="color:#283747; font-family:'BPdots', monospace; font-size:2.5em; font-weight:normal; letter-spacing:0.1em">blockchains</h1>
+  <nav>
+    <a href="/" class="current">Tags</a>
+  | <a href="/blog/" >Notes</a>
+  <hr/>
+  </nav>
+</header>
+
+
+<!-- Content appended here -->
+<div class="franklin-content"><h1 id="blockchain_jargon_from_the_chainlink_article"><a href="#blockchain_jargon_from_the_chainlink_article" class="header-anchor">Blockchain Jargon from the Chainlink Article</a></h1>
+<p>Hey&#33; Here&#39;s a breakdown of the blockchain terms from that article. I&#39;ve organized them so you can quickly understand what each piece does.</p>
+<h2 id="core_concepts"><a href="#core_concepts" class="header-anchor">Core Concepts</a></h2>
+<table><tr><th align="right">Term</th><th align="right">What It Actually Means</th></tr><tr><td align="right"><strong>Oracle</strong></td><td align="right">Think of it as a messenger that brings real-world data &#40;like prices, weather, sports scores&#41; onto the blockchain. Blockchains can&#39;t access the internet directly, so oracles are the bridge.</td></tr><tr><td align="right"><strong>Smart Contract</strong></td><td align="right">A self-executing program on the blockchain. It&#39;s like a vending machine—put money in, get snacks out. No human needed to enforce the rules.</td></tr><tr><td align="right"><strong>DON &#40;Decentralized Oracle Network&#41;</strong></td><td align="right">A group of independent oracle nodes that work together to verify data before it goes on-chain. Safety in numbers—no single point of failure.</td></tr><tr><td align="right"><strong>On-Chain / Off-Chain</strong></td><td align="right">On-chain &#61; data stored on the blockchain &#40;permanent, public&#41;. Off-chain &#61; data stored elsewhere &#40;faster, cheaper, but not as trustless&#41;.</td></tr></table>
+<h2 id="the_five_main_technologies"><a href="#the_five_main_technologies" class="header-anchor">The Five Main Technologies</a></h2>
+<table><tr><th align="right">Term</th><th align="right">The Simple Explanation</th><th align="right">Why It Matters</th></tr><tr><td align="right"><strong>CCIP &#40;Cross-Chain Interoperability Protocol&#41;</strong></td><td align="right">A secure highway for moving assets between different blockchains &#40;like sending money from Ethereum to Polygon&#41;. Think of it as the internet router for blockchains.</td><td align="right">You can use your crypto assets anywhere without being locked into one blockchain.</td></tr><tr><td align="right"><strong>PoR &#40;Proof of Reserve&#41;</strong></td><td align="right">A system that constantly checks if stablecoins &#40;like USDC&#41; actually have real dollars backing them. It&#39;s like an automatic auditor that never sleeps.</td><td align="right">Prevents situations where a &quot;dollar-backed&quot; coin has no dollars behind it &#40;like the FTX collapse&#41;.</td></tr><tr><td align="right"><strong>VRF &#40;Verifiable Random Function&#41;</strong></td><td align="right">A way to generate random numbers that are provably fair and can&#39;t be cheated. It&#39;s like a lottery machine with a mathematical guarantee.</td><td align="right">NFT drops, gaming loot, and anything needing fairness can&#39;t be rigged by the creator or players.</td></tr><tr><td align="right"><strong>OEV &#40;Oracle Extractable Value&#41;</strong></td><td align="right">Turning front-running profits into revenue for users instead of bots. When prices update, bots compete to PAY the protocol &#40;via auction&#41; rather than extract value.</td><td align="right">Instead of bots stealing millions, that money goes back to users and protocols.</td></tr><tr><td align="right"><strong>SVR &#40;Smart Value Recapture&#41;</strong></td><td align="right">Making &quot;free riders&quot; pay for oracle data. If you use Chainlink&#39;s price feeds without paying, SVR tracks your usage and charges micro-fees.</td><td align="right">Sustainable funding for oracles without relying on one sponsor to foot the bill.</td></tr></table>
+<h2 id="technical_components"><a href="#technical_components" class="header-anchor">Technical Components</a></h2>
+<table><tr><th align="right">Term</th><th align="right">What&#39;s Happening Here</th></tr><tr><td align="right"><strong>OnRamp / OffRamp</strong></td><td align="right">OnRamp &#61; where assets enter the cross-chain highway &#40;locked on source chain&#41;. OffRamp &#61; where they exit &#40;unlocked on destination chain&#41;.</td></tr><tr><td align="right"><strong>Risk Management Network</strong></td><td align="right">A safety layer that watches for weird transactions &#40;like someone trying to drain &#36;1 billion in 5 seconds&#41; and hits the brakes.</td></tr><tr><td align="right"><strong>Byzantine Fault Tolerant</strong></td><td align="right">A system that still works correctly even if some nodes lie or fail. Named after the &quot;Byzantine Generals Problem&quot; in computer science.</td></tr><tr><td align="right"><strong>MEV &#40;Maximal Extractable Value&#41;</strong></td><td align="right">The profit bots make by reordering or front-running transactions. It&#39;s like scalping concert tickets but for blockchain transactions.</td></tr><tr><td align="right"><strong>Gas Fees</strong></td><td align="right">The cost to execute transactions on a blockchain. Like paying postage to send a letter, but the price changes based on network traffic.</td></tr></table>
+<h2 id="token_economic_terms"><a href="#token_economic_terms" class="header-anchor">Token &amp; Economic Terms</a></h2>
+<table><tr><th align="right">Term</th><th align="right">What You Need to Know</th></tr><tr><td align="right"><strong>LINK</strong></td><td align="right">Chainlink&#39;s cryptocurrency token. It&#39;s the &quot;fuel&quot; that powers the network—users pay in stablecoins, but under the hood, it gets converted to LINK to pay node operators.</td></tr><tr><td align="right"><strong>Staking</strong></td><td align="right">Locking up your LINK tokens to help secure the network and earn rewards. Like putting money in a savings account, but you&#39;re also helping run the infrastructure.</td></tr><tr><td align="right"><strong>Payment Abstraction</strong></td><td align="right">The magic trick where banks pay in dollars, but LINK gets bought automatically behind the scenes. Banks never see the crypto.</td></tr><tr><td align="right"><strong>Circulating Supply</strong></td><td align="right">The amount of a token that&#39;s actually available to trade &#40;not locked up by staking or in company treasuries&#41;.</td></tr></table>
+<h2 id="advanced_concepts"><a href="#advanced_concepts" class="header-anchor">Advanced Concepts</a></h2>
+<table><tr><th align="right">Term</th><th align="right">The Breakdown</th></tr><tr><td align="right"><strong>Atomic Transaction</strong></td><td align="right">All-or-nothing execution. Either every step completes successfully, or the whole thing reverts. No half-finished transactions.</td></tr><tr><td align="right"><strong>Blockhash</strong></td><td align="right">A unique fingerprint of a blockchain block. Used as a random seed because it can&#39;t be predicted in advance.</td></tr><tr><td align="right"><strong>Circuit Breaker</strong></td><td align="right">An automatic safety switch. If something looks suspicious &#40;like reserves dropping below 100&#37;&#41;, the system pauses itself.</td></tr><tr><td align="right"><strong>Cryptographic Proof</strong></td><td align="right">Mathematical evidence that something happened correctly. You can verify it yourself without trusting anyone.</td></tr><tr><td align="right"><strong>Liquidation</strong></td><td align="right">When someone&#39;s collateral &#40;like their crypto backing a loan&#41; gets automatically sold because the value dropped too much.</td></tr></table>
+<h2 id="real-world_parallels"><a href="#real-world_parallels" class="header-anchor">Real-World Parallels</a></h2>
+<p>Think of this whole ecosystem like:</p>
+<ul>
+<li><p><strong>CCIP</strong> &#61; FedEx &#40;moving packages between locations&#41;</p>
+</li>
+<li><p><strong>PoR</strong> &#61; Bank auditor &#40;checking reserves are real&#41;</p>
+</li>
+<li><p><strong>VRF</strong> &#61; Dice at a casino &#40;provably fair randomness&#41;</p>
+</li>
+<li><p><strong>OEV</strong> &#61; Toll booth &#40;turning bot profits into user revenue&#41;</p>
+</li>
+<li><p><strong>SVR</strong> &#61; Netflix charging for your account after you&#39;ve been mooching off your friend</p>
+</li>
+</ul>
+<p>The genius is that traditional finance companies use all this without realizing they&#39;re participating in crypto. They pay in dollars, get their service, and Chainlink handles all the blockchain complexity invisibly.</p>
+<div class="page-foot">
+    Contact me by <a href="mailto:skchu@wustl.edu">E-mail</a> | <a href="https://github.com/kchu25">Github</a> | <a href="https://www.linkedin.com/in/kchu1/">Linkedin</a>
+    <br>
+    This work is licensed under <a href="http://creativecommons.org/licenses/by-sa/4.0/">CC BY-SA 4.0</a>.  Last modified: January 23, 2026.
+    <br>
+    Website built with <a href="https://github.com/tlienart/Franklin.jl">Franklin.jl</a> and the <a href="https://julialang.org">Julia language</a>.
+</div>
+</div><!-- CONTENT ENDS HERE -->
+    
+    
+  </body>
+</html>
