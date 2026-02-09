@@ -10,3 +10,4 @@
 - [decentralized-storage](tag/decentralized-storage)
 - [desci](tag/desci)
 - [chainlink](tag/chainlink)
+- [general](tag/general)
