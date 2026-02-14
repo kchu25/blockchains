@@ -198,53 +198,18 @@
 └──────────────────────────────────────────────────┘</code></pre>
 <p><strong>How this solves CAP for sovereign use:</strong></p>
 <ol>
-<li><p><strong>Settlement Layer &#40;Ethereum&#41;:</strong> Pure CP. Slow, expensive, but when a state transition is finalized here, it is <em>immutable</em>. This is where the \(10B treasury transfer ultimately settles.
-
-2. **Execution Layer (Custom L2):** Leans AP for day-to-day operations. Citizen payments clear in milliseconds. But every batch of transactions gets "anchored" back to L1, inheriting its security guarantees.
-
-3. **Data Layer:** Stores the full transaction history cheaply so anyone can verify. Doesn't need to be fast—just available and correct.
-
-$$\text{User experience: } \underbrace{\text{AP speed}}_{\text{Layer 2}} \quad + \quad \text{Security guarantee: } \underbrace{\text{CP finality}}_{\text{Layer 1}}$$
-
-A country like the UAE or Singapore in 2026 doesn't just "use Ethereum." It builds a modular stack that gets the speed of a DAG or Hashgraph while keeping the battle-tested safety of the Ethereum mainnet.
-
-**This is the key insight: Layer 2s don't replace the CAP tradeoff—they let you make different tradeoffs at different layers.**
-
-Daily coffee purchases can tolerate AP (fast, occasionally inconsistent). Sovereign treasury settlement demands CP (slow, always correct). The modular stack gives you both, without compromising either.
-
----
-
-## Why Ethereum's Moat Is Real
-
-Putting it all together, Ethereum's competitive advantage isn't speed or cost—it's that it occupies the **CP settlement layer** position and has the Lindy Effect working in its favor:
-
-1. **CAP Position:** Ethereum chose CP. It's slow and expensive *on purpose*. That's the point. It's the "vault," not the "cash register."
-
-2. **Network Effects:** Every Layer 2 that builds on Ethereum *reinforces* its position as the settlement layer. More L2s → more economic activity → more security budget → harder to attack → more L2s. This is a flywheel.
-
-3. **Lindy Effect:** 10+ years of surviving every attack. No other smart contract platform comes close. New chains can't buy this—they can only earn it by surviving.
-
-4. **Institutional Trust:** When a central bank evaluates blockchain infrastructure, they're asking "can I trust this with my country's wealth for the next 50 years?" The answer requires CP guarantees + battle-tested track record. Ethereum has both.
-
-$$\text{Ethereum's moat} = \underbrace{\text{CP guarantees}}_{\text{correct by design}} + \underbrace{\text{Lindy Effect}}_{\text{proven by time}} + \underbrace{\text{L2 flywheel}}_{\text{growing by network effects}}$$
-
-The "old" tech wins in finance precisely *because* it's old. A nation-state doesn't want the shiny new chain with 100,000 TPS and 6 months of uptime. It wants the boring, slow, expensive chain that has never lost a dollar to a consensus failure in a decade.
-
-That's not a weakness. That's a moat.
-
----
-
-## The Takeaway
-
-The CAP theorem isn't just an academic curiosity—it's the lens through which institutional finance evaluates every blockchain:
-
-- **Retail traders** optimize for **A** (availability, speed, low fees) → they pick AP chains
-- **Nation-states** optimize for **C** (consistency, finality, one truth) → they pick CP chains
-- **The modular stack** lets you build AP experiences on top of CP foundations
-
-The next time someone says "Ethereum is too slow and expensive," ask them: *slow and expensive compared to what?* Compared to Solana, yes. Compared to SWIFT (3–5 days, \)<hr /></p>
+<li><p><strong>Settlement Layer &#40;Ethereum&#41;:</strong> Pure CP. Slow, expensive, but when a state transition is finalized here, it is <em>immutable</em>. This is where the &#36;10B treasury transfer ultimately settles.</p>
+</li>
+<li><p><strong>Execution Layer &#40;Custom L2&#41;:</strong> Leans AP for day-to-day operations. Citizen payments clear in milliseconds. But every batch of transactions gets &quot;anchored&quot; back to L1, inheriting its security guarantees.</p>
+</li>
+<li><p><strong>Data Layer:</strong> Stores the full transaction history cheaply so anyone can verify. Doesn&#39;t need to be fast—just available and correct.</p>
 </li>
 </ol>
+\[\text{User experience: } \underbrace{\text{AP speed}}_{\text{Layer 2}} \quad + \quad \text{Security guarantee: } \underbrace{\text{CP finality}}_{\text{Layer 1}}\]
+<p>A country like the UAE or Singapore in 2026 doesn&#39;t just &quot;use Ethereum.&quot; It builds a modular stack that gets the speed of a DAG or Hashgraph while keeping the battle-tested safety of the Ethereum mainnet.</p>
+<p><strong>This is the key insight: Layer 2s don&#39;t replace the CAP tradeoff—they let you make different tradeoffs at different layers.</strong></p>
+<p>Daily coffee purchases can tolerate AP &#40;fast, occasionally inconsistent&#41;. Sovereign treasury settlement demands CP &#40;slow, always correct&#41;. The modular stack gives you both, without compromising either.</p>
+<hr />
 <h2 id="why_ethereums_moat_is_real"><a href="#why_ethereums_moat_is_real" class="header-anchor">Why Ethereum&#39;s Moat Is Real</a></h2>
 <p>Putting it all together, Ethereum&#39;s competitive advantage isn&#39;t speed or cost—it&#39;s that it occupies the <strong>CP settlement layer</strong> position and has the Lindy Effect working in its favor:</p>
 <ol>
@@ -257,7 +222,7 @@ The next time someone says "Ethereum is too slow and expensive," ask them: *slow
 <li><p><strong>Institutional Trust:</strong> When a central bank evaluates blockchain infrastructure, they&#39;re asking &quot;can I trust this with my country&#39;s wealth for the next 50 years?&quot; The answer requires CP guarantees &#43; battle-tested track record. Ethereum has both.</p>
 </li>
 </ol>
-&#36;\text&#123;Ethereum&#39;s moat&#125; &#61; \underbrace&#123;\text&#123;CP guarantees}}_&#123;\text&#123;correct by design}} &#43; \underbrace&#123;\text&#123;Lindy Effect}}_&#123;\text&#123;proven by time}} &#43; \underbrace&#123;\text&#123;L2 flywheel}}_&#123;\text&#123;growing by network effects}}&#36;
+\[\text{Ethereum's moat} = \underbrace{\text{CP guarantees}}_{\text{correct by design}} + \underbrace{\text{Lindy Effect}}_{\text{proven by time}} + \underbrace{\text{L2 flywheel}}_{\text{growing by network effects}}\]
 <p>The &quot;old&quot; tech wins in finance precisely <em>because</em> it&#39;s old. A nation-state doesn&#39;t want the shiny new chain with 100,000 TPS and 6 months of uptime. It wants the boring, slow, expensive chain that has never lost a dollar to a consensus failure in a decade.</p>
 <p>That&#39;s not a weakness. That&#39;s a moat.</p>
 <hr />
@@ -271,7 +236,7 @@ The next time someone says "Ethereum is too slow and expensive," ask them: *slow
 <li><p><strong>The modular stack</strong> lets you build AP experiences on top of CP foundations</p>
 </li>
 </ul>
-<p>The next time someone says &quot;Ethereum is too slow and expensive,&quot; ask them: <em>slow and expensive compared to what?</em> Compared to Solana, yes. Compared to SWIFT &#40;3–5 days, 25–50 per transfer&#41;, Ethereum is blazingly fast, radically cheap, and infinitely more transparent.</p>
+<p>The next time someone says &quot;Ethereum is too slow and expensive,&quot; ask them: <em>slow and expensive compared to what?</em> Compared to Solana, yes. Compared to SWIFT &#40;3–5 days, &#36;25–50 per transfer&#41;, Ethereum is blazingly fast, radically cheap, and infinitely more transparent.</p>
 <p>The &quot;right&quot; blockchain depends entirely on what you&#39;re optimizing for. And when you&#39;re optimizing for &quot;my country&#39;s treasury doesn&#39;t disappear,&quot; slow and boring wins every time.</p>
 <div class="page-foot">
     Contact me by <a href="mailto:skchu@wustl.edu">E-mail</a> | <a href="https://github.com/kchu25">Github</a> | <a href="https://www.linkedin.com/in/kchu1/">Linkedin</a>

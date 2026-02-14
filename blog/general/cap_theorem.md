@@ -225,7 +225,7 @@ The answer: **the modular blockchain stack.** Don't force one chain to do everyt
 
 **How this solves CAP for sovereign use:**
 
-1. **Settlement Layer (Ethereum):** Pure CP. Slow, expensive, but when a state transition is finalized here, it is *immutable*. This is where the $10B treasury transfer ultimately settles.
+1. **Settlement Layer (Ethereum):** Pure CP. Slow, expensive, but when a state transition is finalized here, it is *immutable*. This is where the \$10B treasury transfer ultimately settles.
 
 2. **Execution Layer (Custom L2):** Leans AP for day-to-day operations. Citizen payments clear in milliseconds. But every batch of transactions gets "anchored" back to L1, inheriting its security guarantees.
 
@@ -269,6 +269,6 @@ The CAP theorem isn't just an academic curiosity—it's the lens through which i
 - **Nation-states** optimize for **C** (consistency, finality, one truth) → they pick CP chains
 - **The modular stack** lets you build AP experiences on top of CP foundations
 
-The next time someone says "Ethereum is too slow and expensive," ask them: *slow and expensive compared to what?* Compared to Solana, yes. Compared to SWIFT (3–5 days, $25–50 per transfer), Ethereum is blazingly fast, radically cheap, and infinitely more transparent.
+The next time someone says "Ethereum is too slow and expensive," ask them: *slow and expensive compared to what?* Compared to Solana, yes. Compared to SWIFT (3–5 days, \$25–50 per transfer), Ethereum is blazingly fast, radically cheap, and infinitely more transparent.
 
 The "right" blockchain depends entirely on what you're optimizing for. And when you're optimizing for "my country's treasury doesn't disappear," slow and boring wins every time.
