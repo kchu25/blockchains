@@ -151,7 +151,7 @@ A nation's reserve is not a Uniswap trade. Consider what's at stake:
 | Network partition during crisis | Conflicting states on each side | System waits for consensus, no conflicting states |
 | Auditing 5 years later | "Which version of history is canonical?" | One history. Immutable. Provable. |
 
-For a country, a **false confirmation** on a $10B transfer is an existential crisis. Waiting 13 minutes is a rounding error compared to the 3–5 days SWIFT currently takes.
+For a country, a **false confirmation** on a \$10B transfer is an existential crisis. Waiting 13 minutes is a rounding error compared to the 3–5 days SWIFT currently takes.
 
 ### The Sovereign-Grade Ranking
 

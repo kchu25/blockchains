@@ -32,7 +32,7 @@ In Proof-of-Work (Bitcoin, old Ethereum):
 - Economies of scale heavily favor large operations
 - High electricity costs create barriers to entry
 
-With staking, you just need the tokens. A person with $100 and a person with $100M both get the same ~5% return. That's more egalitarian than mining.
+With staking, you just need the tokens. A person with \$100 and a person with \$100M both get the same ~5% return. That's more egalitarian than mining.
 
 ### 2. **Dilution Pressure**
 
@@ -45,7 +45,7 @@ As new tokens are issued to stakers, non-stakers' percentage shrinks. This creat
 ### 3. **Lower Barriers to Entry**
 
 - No hardware required
-- Minimum stakes are often quite low (32 ETH for Ethereum is high, but many protocols allow staking with $10-100)
+- Minimum stakes are often quite low (32 ETH for Ethereum is high, but many protocols allow staking with \$10-100)
 - Staking pools let you participate with even less
 - Anyone with internet access can participate
 
