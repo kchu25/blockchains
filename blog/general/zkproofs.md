@@ -45,12 +45,11 @@ A ZK proof is about a **statement**. In math, we call the statement $x$ (just a 
 > Suppose the statement is: "I know a password whose SHA-256 hash is `0xABCD...`"
 >
 > - $x$ = the public hash value `0xABCD...` (this is the **statement** — the thing everyone can see)
-> - $L$ = the set of all hash values that *actually have* a preimage (i.e., all valid hashes someone could know a password for)
-> - $x \in L$ means "this hash really does correspond to some password" (the statement is true)
-> - $x \notin L$ means "this hash has no valid preimage" (the statement is false)
-> - The **witness** $w$ = the actual password itself (the secret that *proves* the statement is true)
+> - $w$ = the actual password itself (the **witness** — the secret the prover holds)
+> - The **language** $L$ is the set of $(x, w)$ pairs where $w$ is a valid witness for $x$. More concretely, $L$ encodes the relation: "SHA-256$(w) = x$." Saying $x \in L$ means "there exists a $w$ such that SHA-256$(w) = x$"—in plain English, *the prover's claim is true*.
+> - $x \notin L$ would mean no such $w$ exists—but note this is about the *claim*, not the hash function's domain. SHA-256 is defined on all bitstrings, so every 256-bit output is technically a valid hash of something. The point is whether the *prover's specific claim* ("I know a $w$ hashing to this $x$") is true or false.
 >
-> The prover knows both $x$ (the hash) and $w$ (the password). The verifier only sees $x$ (the hash). The ZK proof convinces the verifier that a valid password exists, *without revealing the password*.
+> The prover knows both $x$ (the hash) and $w$ (the password). The verifier only sees $x$. The ZK proof convinces the verifier that $w$ exists and the prover knows it, *without revealing $w$ itself*.
 
 A **zero-knowledge proof system** for a language $L$ is an interactive protocol between two parties:
 
