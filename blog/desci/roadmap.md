@@ -1,5 +1,5 @@
 
-@def title = "BDeSci Platform Tech Stack - Your Friendly Roadmap"
+@def title = "DeSci Platform Tech Stack - Your Friendly Roadmap"
 @def published = "30 December 2025"
 @def tags = ["desci"]
 
