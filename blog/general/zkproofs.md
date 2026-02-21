@@ -51,53 +51,76 @@ A ZK proof is about a **statement**. In math, we call the statement $x$ (just a 
 >
 > The prover knows both $x$ (the hash) and $w$ (the password). The verifier only sees $x$. The ZK proof convinces the verifier that $w$ exists and the prover knows it, *without revealing $w$ itself*.
 
-A **zero-knowledge proof system** for a language $L$ is an interactive protocol between two parties:
+A **zero-knowledge proof system** for a language $L$ is a back-and-forth message exchange between two parties—the prover sends a message, the verifier replies, the prover replies again, and so on for a fixed number of rounds, after which the verifier outputs accept or reject:
 
 - **Prover** $\mathcal{P}$: knows the statement $x$ *and* the secret witness $w$. Wants to convince the verifier that $x \in L$.
 - **Verifier** $\mathcal{V}$: knows only the statement $x$. Wants to be convinced, but should learn nothing beyond "$x \in L$" (the statement is true).
 
-The protocol must satisfy three properties:
+### What's a "Protocol," Mathematically?
+
+The word "protocol" sounds vague. It's not. Each party is just a **function** that takes the conversation so far and outputs the next message. Both parties also have access to private randomness (coin flips).
+
+Formally, a **$k$-round protocol** ($k$ = total number of messages sent back and forth) is specified by a pair of functions:
+
+$$\mathcal{P}: (x, w, r_P, m_1, m_2, \ldots) \mapsto m_{\text{next}}$$
+$$\mathcal{V}: (x, r_V, m_1, m_2, \ldots) \mapsto m_{\text{next}} \;\text{ or }\; \{\text{accept}, \text{reject}\}$$
+
+where:
+- $x$ = the public statement (both parties see it)
+- $w$ = the witness (only $\mathcal{P}$ has it)
+- $r_P, r_V$ = private random coins (each party flips their own)
+- $m_1, m_2, \ldots$ = the messages exchanged so far (the conversation history)
+
+The execution goes like a ping-pong game:
+
+$$m_1 = \mathcal{P}(x, w, r_P) \;\;\longrightarrow\;\; m_2 = \mathcal{V}(x, r_V, m_1) \;\;\longrightarrow\;\; m_3 = \mathcal{P}(x, w, r_P, m_1, m_2) \;\;\longrightarrow\;\; \cdots$$
+
+After some fixed number of rounds, $\mathcal{V}$ outputs accept or reject.
+
+> **What's the "transcript"?** It's the full record of this ping-pong: the tuple $(m_1, m_2, \ldots, m_k)$ plus the final accept/reject decision. Think of it as a chat log.
+>
+> **Where does the probability come from?** Both $r_P$ and $r_V$ are random. The probability in statements like $\Pr[\ldots] = 1$ is over these random coin flips. Given a *fixed* $x$, different random coins produce different conversations. The probability measures "over all possible coin flips, how often does the verifier accept?"
+>
+> **What makes $\mathcal{P}^*$ (a cheating prover) different from $\mathcal{P}$?** An honest $\mathcal{P}$ follows the prescribed function above. A cheating $\mathcal{P}^*$ can be *any* function—it can compute its messages however it wants. The soundness property says: even if you replace $\mathcal{P}$ with an arbitrary function $\mathcal{P}^*$, the verifier still rejects false statements. Similarly, $\mathcal{V}^*$ is an arbitrary verifier function that might deviate from the protocol to try to extract information.
+
+With this in mind, the three properties are:
 
 ### 1. Completeness
 
-If the statement is true and both parties follow the protocol honestly, the verifier always accepts.
+If the statement is true and both parties follow the prescribed functions, the verifier always accepts (over all possible random coins).
 
-$$x \in L \implies \Pr\bigl[\mathcal{P} \leftrightarrow \mathcal{V} \text{ accepts on input } x\bigr] = 1$$
+$$x \in L \implies \Pr_{r_P, r_V}\bigl[\mathcal{V} \text{ outputs accept}\bigr] = 1$$
 
 *"An honest prover can always convince an honest verifier."*
 
-> **Notation clarification:** $\mathcal{P} \leftrightarrow \mathcal{V}$ just means "prover and verifier run the interactive protocol together." Some textbooks write $\langle \mathcal{P}, \mathcal{V} \rangle(x)$ for this—the angle brackets $\langle \cdot, \cdot \rangle$ denote an **interactive session** between the two parties (it is NOT an inner product here). The $(x)$ means both parties receive the public statement $x$ as input. The whole expression evaluates to either "accept" or "reject."
-
 ### 2. Soundness
 
-If the statement is false, no cheating prover can trick the verifier (except with negligible probability).
+If the statement is false, no matter what function $\mathcal{P}^*$ uses to compute its messages (the star means it can be *any* function, not necessarily the honest one), the verifier still rejects with high probability.
 
-$$x \notin L \implies \forall\, \mathcal{P}^*:\; \Pr\bigl[\mathcal{P}^* \leftrightarrow \mathcal{V} \text{ accepts on input } x\bigr] \leq \epsilon$$
+$$x \notin L \implies \forall\, \mathcal{P}^*:\; \Pr_{r_V}\bigl[\mathcal{V} \text{ outputs accept when interacting with } \mathcal{P}^*\bigr] \leq \epsilon$$
 
-where $\epsilon$ is the **soundness error** (probability of a cheater getting lucky).
+where $\epsilon$ is the **soundness error**. For protocols with multiple rounds, $\epsilon \leq 2^{-n}$ after $n$ rounds—it shrinks exponentially.
 
-> **What's $\mathcal{P}^*$?** The star means a **malicious** (cheating) prover—one that doesn't follow the protocol and tries any trick to fool the verifier. The statement says: even if the cheating prover has unlimited computational power and uses *any strategy whatsoever* ($\forall \mathcal{P}^*$), it still can't convince the verifier of a false statement (except with tiny probability $\epsilon$). For protocols with multiple rounds, $\epsilon \leq 2^{-n}$ after $n$ rounds—it shrinks exponentially.
+> Note: the probability here is only over $r_V$ (the verifier's coins). We need soundness to hold for *all possible* $\mathcal{P}^*$, regardless of what random coins (or deterministic strategy) it uses.
 
 *"A liar gets caught."*
 
 ### 3. Zero-Knowledge
 
-The verifier learns nothing beyond "the statement is true." Here's the formal way to say this:
+The verifier learns nothing beyond "the statement is true." Formally:
 
-There exists a **simulator** $\mathcal{S}$—an algorithm that does NOT know the secret witness $w$—that can produce fake conversation transcripts that look *identical* to real ones.
-
-> **What's a "transcript"?** It's just the sequence of messages exchanged: what the prover sent, what the verifier sent, and the final accept/reject. Think of it as a chat log.
+There exists a **simulator** $\mathcal{S}$—a standalone algorithm that does NOT know the witness $w$—that can produce fake transcripts indistinguishable from real ones.
 
 $$\forall\, \mathcal{V}^*: \quad \mathsf{view}(\mathcal{P} \leftrightarrow \mathcal{V}^*,\, x) \approx \mathcal{S}(x)$$
 
 > **What does this mean, piece by piece?**
 >
-> - $\mathcal{V}^*$ = a possibly **malicious verifier** (the star means "cheating," just like $\mathcal{P}^*$ for the prover). We want zero-knowledge to hold even if the verifier tries tricky strategies to extract information.
-> - $\mathsf{view}(\mathcal{P} \leftrightarrow \mathcal{V}^*, x)$ = the full chat log of a real protocol run between the honest prover and the (possibly cheating) verifier.
-> - $\mathcal{S}(x)$ = a fake transcript generated by the simulator, which only knows the public statement $x$ and does NOT know the witness $w$.
-> - $\approx$ = the two transcripts are **indistinguishable** (no efficient algorithm can tell which is real and which is simulated).
+> - $\mathcal{V}^*$ = a possibly **malicious verifier** (an arbitrary function, not necessarily the honest one). We want zero-knowledge to hold even if the verifier deviates from the protocol to try to extract information.
+> - $\mathsf{view}(\mathcal{P} \leftrightarrow \mathcal{V}^*, x)$ = the full transcript $(m_1, m_2, \ldots, m_k)$ from a real execution, which is a **random variable** (because it depends on $r_P$ and $r_V$).
+> - $\mathcal{S}(x)$ = a fake transcript produced by the simulator using only $x$ (no witness $w$). Also a random variable (the simulator flips its own coins).
+> - $\approx$ = these two random variables have **indistinguishable distributions**. No efficient algorithm, given a transcript, can tell whether it came from a real execution or from the simulator.
 >
-> **The punchline:** If a simulator can produce transcripts that look identical to real ones *without knowing the secret*, then the real transcripts can't contain any information about the secret. The verifier gained nothing it couldn't have computed on its own.
+> **The punchline:** If a simulator can produce transcripts that have the same distribution as real ones *without knowing the secret*, then the real transcripts contain no information about the secret. The verifier gained nothing it couldn't have computed on its own.
 >
 > **Analogy:** It's like proving a magic trick reveals no secrets by showing that a non-magician could produce the same audience experience with video editing. If the audience can't tell the difference, the magic show didn't actually reveal anything.
 
