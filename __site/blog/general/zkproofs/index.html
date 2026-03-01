@@ -1,0 +1,1144 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@700;900&display=swap" rel="stylesheet">
+  <style>
+    @font-face {
+      font-family: 'BPdots';
+      src: url('/blockchains/assets/fonts/BPdots/BPdots.otf') format('opentype');
+      font-weight: normal;
+      font-style: normal;
+    }
+    @font-face {
+      font-family: 'BPdots';
+      src: url('/blockchains/assets/fonts/BPdots/BPdotsBold.otf') format('opentype');
+      font-weight: bold;
+      font-style: normal;
+    }
+  </style>
+   <link rel="stylesheet" href="/libs/katex/katex.min.css">
+     
+   <link rel="stylesheet" href="/libs/highlight/styles/atom-one-dark.min.css">
+   
+  <link rel="stylesheet" href="/css/franklin.css">
+<link rel="stylesheet" href="/css/hypertext.css">
+<link rel="icon" href="/assets/favicon.png">
+
+   <title>Zero-Knowledge Proofs: The Math, The Intuition, and a Julia Playground</title>  
+</head>
+<body>
+<header>
+  <h1 style="color:#283747; font-family:'BPdots', monospace; font-size:2.5em; font-weight:normal; letter-spacing:0.1em">blockchains</h1>
+  <nav>
+    <a href="/" class="current">Tags</a>
+  | <a href="/blog/" >Notes</a>
+  <hr/>
+  </nav>
+</header>
+
+
+<!-- Content appended here -->
+<div class="franklin-content"><h1 id="zero-knowledge_proofs_the_math_the_intuition_and_a_julia_playground"><a href="#zero-knowledge_proofs_the_math_the_intuition_and_a_julia_playground" class="header-anchor">Zero-Knowledge Proofs: The Math, The Intuition, and a Julia Playground</a></h1>
+<p><strong>TL;DR:</strong> A zero-knowledge proof lets you convince someone that a statement is true <em>without revealing why it&#39;s true</em>. This post builds the theory from scratch with formal definitions, then implements a toy ZK system in Julia that you can actually run, break, and extend.</p>
+<hr />
+<h2 id="what_is_a_zero-knowledge_proof"><a href="#what_is_a_zero-knowledge_proof" class="header-anchor">What Is a Zero-Knowledge Proof?</a></h2>
+<p>Imagine you&#39;re colorblind and I want to prove to you that two balls are different colors—without telling you which is red and which is green.</p>
+<p>Here&#39;s the protocol:</p>
+<ol>
+<li><p>You hold one ball in each hand behind your back.</p>
+</li>
+<li><p>You either swap them or don&#39;t &#40;your choice, hidden from me&#41;.</p>
+</li>
+<li><p>You show me the balls again. I tell you whether you swapped.</p>
+</li>
+</ol>
+<p>If the balls were the same color, I&#39;d have to guess—50&#37; chance. But if they&#39;re truly different colors, I can always tell. Repeat this 100 times, and the probability I&#39;m lying drops to \(2^{-100} \approx 10^{-30}\). You&#39;re convinced they&#39;re different colors, but you still don&#39;t know which is red and which is green.</p>
+<p>That&#39;s zero-knowledge in a nutshell: <strong>conviction without information transfer.</strong></p>
+<blockquote>
+<p><strong>Why should I care about this for blockchains?</strong></p>
+<p>Three killer applications:</p>
+<ol>
+<li><p><strong>Privacy</strong>: Prove you have enough funds to make a transaction without revealing your balance &#40;Zcash, Tornado Cash&#41;</p>
+</li>
+<li><p><strong>Scalability</strong>: Prove that 10,000 transactions were executed correctly with a single tiny proof that anyone can verify quickly &#40;ZK-Rollups like zkSync, StarkNet&#41;</p>
+</li>
+<li><p><strong>Identity</strong>: Prove you&#39;re over 18 without revealing your birthdate, prove you&#39;re a citizen without revealing your passport number</p>
+</li>
+</ol>
+<p>ZK proofs are arguably the most important cryptographic primitive for the future of blockchains. They solve the blockchain trilemma&#39;s scalability leg without sacrificing security.</p>
+</blockquote>
+<hr />
+<h2 id="the_formal_definition_every_symbol_explained"><a href="#the_formal_definition_every_symbol_explained" class="header-anchor">The Formal Definition &#40;Every Symbol Explained&#41;</a></h2>
+<p>Let&#39;s be precise—but let me first explain every piece of notation so nothing is mysterious.</p>
+<h3 id="the_setup_statements_languages_and_witnesses"><a href="#the_setup_statements_languages_and_witnesses" class="header-anchor">The Setup: Statements, Languages, and Witnesses</a></h3>
+<p>A ZK proof is about a <strong>statement</strong>. In math, we call the statement \(x\) &#40;just a label—it could be a number, a string, a data structure, anything&#41;. The collection of all <em>true</em> statements is called the <strong>language</strong> \(L\).</p>
+<blockquote>
+<p><strong>Concrete example to ground every symbol:</strong></p>
+<p>Suppose the statement is: &quot;I know a password whose SHA-256 hash is <code>0xABCD...</code>&quot;</p>
+<ul>
+<li><p>\(x\) &#61; the public hash value <code>0xABCD...</code> &#40;this is the <strong>statement</strong> — the thing everyone can see&#41;</p>
+</li>
+<li><p>\(w\) &#61; the actual password itself &#40;the <strong>witness</strong> — the secret the prover holds&#41;</p>
+</li>
+<li><p>The <strong>language</strong> \(L\) is the set of \((x, w)\) pairs where \(w\) is a valid witness for \(x\). More concretely, \(L\) encodes the relation: &quot;SHA-256\((w) = x\).&quot; Saying \(x \in L\) means &quot;there exists a \(w\) such that SHA-256\((w) = x\)&quot;—in plain English, <em>the prover&#39;s claim is true</em>.</p>
+</li>
+<li><p>\(x \notin L\) would mean no such \(w\) exists—but note this is about the <em>claim</em>, not the hash function&#39;s domain. SHA-256 is defined on all bitstrings, so every 256-bit output is technically a valid hash of something. The point is whether the <em>prover&#39;s specific claim</em> &#40;&quot;I know a \(w\) hashing to this \(x\)&quot;&#41; is true or false.</p>
+</li>
+</ul>
+<p>The prover knows both \(x\) &#40;the hash&#41; and \(w\) &#40;the password&#41;. The verifier only sees \(x\). The ZK proof convinces the verifier that \(w\) exists and the prover knows it, <em>without revealing \(w\) itself</em>.</p>
+</blockquote>
+<p>A <strong>zero-knowledge proof system</strong> for a language \(L\) is a back-and-forth message exchange between two parties—the prover sends a message, the verifier replies, the prover replies again, and so on for a fixed number of rounds, after which the verifier outputs accept or reject:</p>
+<ul>
+<li><p><strong>Prover</strong> \(\mathcal{P}\): knows the statement \(x\)<em>and</em> the secret witness \(w\). Wants to convince the verifier that \(x \in L\).</p>
+</li>
+<li><p><strong>Verifier</strong> \(\mathcal{V}\): knows only the statement \(x\). Wants to be convinced, but should learn nothing beyond &quot;\(x \in L\)&quot; &#40;the statement is true&#41;.</p>
+</li>
+</ul>
+<h3 id="whats_a_protocol_mathematically"><a href="#whats_a_protocol_mathematically" class="header-anchor">What&#39;s a &quot;Protocol,&quot; Mathematically?</a></h3>
+<p>The word &quot;protocol&quot; sounds vague. It&#39;s not. Each party is just a <strong>function</strong> that takes the conversation so far and outputs the next message. Both parties also have access to private randomness &#40;coin flips&#41;.</p>
+<p>Formally, a <strong>\(k\)-round protocol</strong> &#40;\(k\) &#61; total number of messages sent back and forth&#41; is specified by a pair of functions:</p>
+\[\mathcal{P}: (x, w, r_P, m_1, m_2, \ldots) \mapsto m_{\text{next}}\]
+\[\mathcal{V}: (x, r_V, m_1, m_2, \ldots) \mapsto m_{\text{next}} \;\text{ or }\; \{\text{accept}, \text{reject}\}\]
+<p>where:</p>
+<ul>
+<li><p>\(x\) &#61; the public statement &#40;both parties see it&#41;</p>
+</li>
+<li><p>\(w\) &#61; the witness &#40;only \(\mathcal{P}\) has it&#41;</p>
+</li>
+<li><p>\(r_P, r_V\) &#61; private random coins &#40;each party flips their own&#41;</p>
+</li>
+<li><p>\(m_1, m_2, \ldots\) &#61; the messages exchanged so far &#40;the conversation history&#41;</p>
+</li>
+</ul>
+<p>The execution goes like a ping-pong game:</p>
+\[m_1 = \mathcal{P}(x, w, r_P) \;\;\longrightarrow\;\; m_2 = \mathcal{V}(x, r_V, m_1) \;\;\longrightarrow\;\; m_3 = \mathcal{P}(x, w, r_P, m_1, m_2) \;\;\longrightarrow\;\; \cdots\]
+<p>After some fixed number of rounds, \(\mathcal{V}\) outputs accept or reject.</p>
+<blockquote>
+<p><strong>What&#39;s the &quot;transcript&quot;?</strong> It&#39;s the full record of this ping-pong: the tuple \((m_1, m_2, \ldots, m_k)\) plus the final accept/reject decision. Think of it as a chat log.</p>
+<p><strong>Where does the probability come from?</strong> Both \(r_P\) and \(r_V\) are random. The probability in statements like \(\Pr[\ldots] = 1\) is over these random coin flips. Given a <em>fixed</em> \(x\), different random coins produce different conversations. The probability measures &quot;over all possible coin flips, how often does the verifier accept?&quot;</p>
+<p><strong>What makes \(\mathcal{P}^*\) &#40;a cheating prover&#41; different from \(\mathcal{P}\)?</strong> An honest \(\mathcal{P}\) follows the prescribed function above. A cheating \(\mathcal{P}^*\) can be <em>any</em> function—it can compute its messages however it wants. The soundness property says: even if you replace \(\mathcal{P}\) with an arbitrary function \(\mathcal{P}^*\), the verifier still rejects false statements. Similarly, \(\mathcal{V}^*\) is an arbitrary verifier function that might deviate from the protocol to try to extract information.</p>
+</blockquote>
+<p>With this in mind, the three properties are:</p>
+<h3 id="completeness"><a href="#completeness" class="header-anchor"><ol>
+<li><p>Completeness</p>
+</li>
+</ol>
+</a></h3>
+<p>If the statement is true and both parties follow the prescribed functions, the verifier always accepts &#40;over all possible random coins&#41;.</p>
+\[x \in L \implies \Pr_{r_P, r_V}\bigl[\mathcal{V} \text{ outputs accept}\bigr] = 1\]
+<p><em>&quot;An honest prover can always convince an honest verifier.&quot;</em></p>
+<h3 id="ol_start2_soundness"><a href="#ol_start2_soundness" class="header-anchor"><ol start="2">
+<li><p>Soundness</p>
+</li>
+</ol>
+</a></h3>
+<p>If the statement is false, no matter what function \(\mathcal{P}^*\) uses to compute its messages &#40;the star means it can be <em>any</em> function, not necessarily the honest one&#41;, the verifier still rejects with high probability.</p>
+\[x \notin L \implies \forall\, \mathcal{P}^*:\; \Pr_{r_V}\bigl[\mathcal{V} \text{ outputs accept when interacting with } \mathcal{P}^*\bigr] \leq \epsilon\]
+<p>where \(\epsilon\) is the <strong>soundness error</strong>. For protocols with multiple rounds, \(\epsilon \leq 2^{-n}\) after \(n\) rounds—it shrinks exponentially.</p>
+<blockquote>
+<p>Note: the probability here is only over \(r_V\) &#40;the verifier&#39;s coins&#41;. We need soundness to hold for <em>all possible</em> \(\mathcal{P}^*\), regardless of what random coins &#40;or deterministic strategy&#41; it uses.</p>
+</blockquote>
+<p><em>&quot;A liar gets caught.&quot;</em></p>
+<h3 id="ol_start3_zero-knowledge"><a href="#ol_start3_zero-knowledge" class="header-anchor"><ol start="3">
+<li><p>Zero-Knowledge</p>
+</li>
+</ol>
+</a></h3>
+<p>The verifier learns nothing beyond &quot;the statement is true.&quot; Formally:</p>
+<p>There exists a <strong>simulator</strong> \(\mathcal{S}\)—a standalone algorithm that does NOT know the witness \(w\)—that can produce fake transcripts indistinguishable from real ones.</p>
+\[\forall\, \mathcal{V}^*: \quad \mathsf{view}(\mathcal{P} \leftrightarrow \mathcal{V}^*,\, x) \approx \mathcal{S}(x)\]
+<blockquote>
+<p><strong>What does this mean, piece by piece?</strong></p>
+<ul>
+<li><p>\(\mathcal{V}^*\) &#61; a possibly <strong>malicious verifier</strong> &#40;an arbitrary function, not necessarily the honest one&#41;. We want zero-knowledge to hold even if the verifier deviates from the protocol to try to extract information.</p>
+</li>
+<li><p>\(\mathsf{view}(\mathcal{P} \leftrightarrow \mathcal{V}^*, x)\) &#61; the full transcript \((m_1, m_2, \ldots, m_k)\) from a real execution, which is a <strong>random variable</strong> &#40;because it depends on \(r_P\) and \(r_V\)&#41;.</p>
+</li>
+<li><p>\(\mathcal{S}(x)\) &#61; a fake transcript produced by the simulator using only \(x\) &#40;no witness \(w\)&#41;. Also a random variable &#40;the simulator flips its own coins&#41;.</p>
+</li>
+<li><p>\(\approx\) &#61; these two random variables have <strong>indistinguishable distributions</strong>. No efficient algorithm, given a transcript, can tell whether it came from a real execution or from the simulator.</p>
+</li>
+</ul>
+<p><strong>The punchline:</strong> If a simulator can produce transcripts that have the same distribution as real ones <em>without knowing the secret</em>, then the real transcripts contain no information about the secret. The verifier gained nothing it couldn&#39;t have computed on its own.</p>
+<p><strong>Analogy:</strong> It&#39;s like proving a magic trick reveals no secrets by showing that a non-magician could produce the same audience experience with video editing. If the audience can&#39;t tell the difference, the magic show didn&#39;t actually reveal anything.</p>
+</blockquote>
+<hr />
+<h2 id="warm-up_a_simple_zk_proof_with_just_arithmetic"><a href="#warm-up_a_simple_zk_proof_with_just_arithmetic" class="header-anchor">Warm-Up: A Simple ZK Proof With Just Arithmetic</a></h2>
+<p>Before we get to &quot;real&quot; cryptographic ZK proofs, let&#39;s build intuition with a simpler example using nothing but modular arithmetic. No cyclic groups, no generators—just numbers.</p>
+<h3 id="the_secret_number_game"><a href="#the_secret_number_game" class="header-anchor">The &quot;Secret Number&quot; Game</a></h3>
+<p>Suppose I claim to know a secret number \(w\) such that \(w^2 \mod 77 = 4\). The public statement is &quot;4&quot; and the number 77. The witness is my secret \(w\).</p>
+<blockquote>
+<p>There are actually multiple solutions here &#40;e.g., \(w = 2\) since \(2^2 = 4\), or \(w = 75\) since \(75^2 = 5625 = 73 \times 77 + 4\)&#41;. That&#39;s fine—I just need to know <em>one</em>.</p>
+</blockquote>
+<p>Here&#39;s a protocol:</p>
+<ol>
+<li><p><strong>I commit</strong>: I pick a random number \(r\), compute \(a = r^2 \mod 77\), and send you \(a\).</p>
+</li>
+<li><p><strong>You challenge</strong>: You flip a coin and send me \(e \in \{0, 1\}\).</p>
+</li>
+<li><p><strong>I respond</strong>:</p>
+<ul>
+<li><p>If \(e = 0\): I send \(z = r \mod 77\). You check \(z^2 \equiv a \pmod{77}\).</p>
+</li>
+<li><p>If \(e = 1\): I send \(z = r \cdot w \mod 77\). You check \(z^2 \equiv a \cdot 4 \pmod{77}\).</p>
+</li>
+</ul>
+</li>
+</ol>
+<p><strong>Why this works:</strong></p>
+<ul>
+<li><p><strong>Completeness</strong>: If I know \(w\), I can always answer correctly.</p>
+</li>
+<li><p><strong>Soundness</strong>: If I <em>don&#39;t</em> know \(w\), I can answer \(e=0\) &#40;by showing \(r\)&#41; or \(e=1\) &#40;by guessing&#41;, but not both for the same commitment \(a\). So I cheat with probability \(\leq 1/2\). Repeat 100 times → cheating probability \(\leq 2^{-100}\).</p>
+</li>
+<li><p><strong>Zero-knowledge</strong>: Each round, you see either \(r\) &#40;random, reveals nothing about \(w\)&#41; or \(r \cdot w\) &#40;also random-looking, since \(r\) is random&#41;. You never see \(w\) itself.</p>
+</li>
+</ul>
+<p>This is simpler but has a drawback: the soundness error is \(1/2\) per round, so you need ~100 rounds for strong security. The Schnorr protocol below gets negligible soundness error in a <em>single</em> round by using a larger challenge space.</p>
+<hr />
+<h2 id="the_math_schnorrs_identification_protocol"><a href="#the_math_schnorrs_identification_protocol" class="header-anchor">The Math: Schnorr&#39;s Identification Protocol</a></h2>
+<p>Now let&#39;s build a real ZK proof. <strong>Schnorr&#39;s protocol</strong> proves &quot;I know a secret number \(x\) that corresponds to a public value \(y\)&quot; without revealing \(x\). The core idea is the same as our warm-up, but using exponentiation modulo a prime instead of squaring.</p>
+<h3 id="the_one-way_function_well_use"><a href="#the_one-way_function_well_use" class="header-anchor">The One-Way Function We&#39;ll Use</a></h3>
+<p>We need a function that&#39;s easy to compute forward but hard to reverse. We&#39;ll use <strong>modular exponentiation</strong>:</p>
+\[f(x) = g^x \mod p\]
+<p>where \(p\) is a large prime number and \(g\) is a fixed base.</p>
+<blockquote>
+<p><strong>Why is this hard to reverse?</strong> Computing \(g^x \mod p\) is fast &#40;repeated squaring: \(O(\log x)\) multiplications&#41;. But given \(y = g^x \mod p\), finding \(x\) is the <strong>discrete logarithm problem</strong>—no known efficient algorithm exists for large primes. The best algorithms are sub-exponential: roughly \(e^{O(\sqrt{\log p \cdot \log \log p})}\) operations. For a 2048-bit prime, this is astronomically infeasible.</p>
+<p>You can think of \(g^x \mod p\) as a &quot;hash&quot; of \(x\) that preserves algebraic structure. Unlike SHA-256, which destroys structure, modular exponentiation lets you do useful math with the &quot;hashed&quot; values—which is exactly what makes ZK proofs possible.</p>
+</blockquote>
+<h3 id="whats_a_cyclic_group_and_why_do_we_need_one"><a href="#whats_a_cyclic_group_and_why_do_we_need_one" class="header-anchor">What&#39;s a Cyclic Group? &#40;And Why Do We Need One?&#41;</a></h3>
+<p>When we compute \(g^x \mod p\) for \(x = 0, 1, 2, 3, \ldots\), the results eventually cycle back to the beginning:</p>
+\[g^0 \mod p = 1, \quad g^1 \mod p, \quad g^2 \mod p, \quad \ldots, \quad g^{q-1} \mod p, \quad g^q \mod p = 1 \text{ (back to start)}\]
+<p>This set of values \(\{g^0, g^1, \ldots, g^{q-1}\}\) &#40;all computed mod \(p\)&#41; forms a <strong>cyclic group</strong> of order \(q\). &quot;Cyclic&quot; just means it wraps around. &quot;Order \(q\)&quot; means there are \(q\) distinct elements before it repeats.</p>
+<blockquote>
+<p><strong>Why do we care?</strong> We need the exponents to &quot;wrap around&quot; in a controlled way &#40;modulo \(q\)&#41;. When the prover computes \(z = r + e \cdot x\), this arithmetic happens modulo \(q\)—the group order. If \(q\) weren&#39;t prime, there could be shortcuts to find \(x\). A prime-order group gives us maximum security.</p>
+</blockquote>
+<h3 id="the_setup"><a href="#the_setup" class="header-anchor">The Setup</a></h3>
+<p>We pick:</p>
+<ul>
+<li><p>A large prime \(p\) &#40;defines our modular arithmetic&#41;</p>
+</li>
+<li><p>A prime \(q\) that divides \(p - 1\) &#40;the order of our cyclic subgroup&#41;</p>
+</li>
+<li><p>A generator \(g\) &#40;a number whose powers produce the entire subgroup&#41;</p>
+</li>
+</ul>
+<p>Then:</p>
+<ul>
+<li><p><strong>Prover&#39;s secret</strong> &#40;witness&#41;: a random number \(x\) from \(\{1, 2, \ldots, q-1\}\)</p>
+</li>
+<li><p><strong>Public statement</strong>: \(y = g^x \mod p\) &#40;easy to compute, hard to reverse&#41;</p>
+</li>
+</ul>
+<h3 id="the_protocol_three_moves"><a href="#the_protocol_three_moves" class="header-anchor">The Protocol: Three Moves</a></h3>
+<p>The Schnorr protocol is a <strong>Sigma protocol</strong> &#40;Σ-protocol&#41;—a three-move structure that shows up everywhere in cryptography:</p>
+\[\mathcal{P} \xrightarrow{\text{commit } a} \mathcal{V} \xrightarrow{\text{challenge } e} \mathcal{P} \xrightarrow{\text{respond } z} \mathcal{V}\]
+<p>Here&#39;s what happens:</p>
+<p><strong>Step 1 — Commitment &#40;Prover → Verifier&#41;:</strong></p>
+<p>The prover picks a random \(r\) uniformly from \(\{1, 2, \ldots, q-1\}\) and sends:</p>
+\[a = g^r \mod p\]
+<blockquote>
+<p><strong>Notation:</strong> Some textbooks write \(r \xleftarrow{\$} \mathbb{Z}_q\) for &quot;pick \(r\) randomly from the set \(\{0, 1, \ldots, q-1\}\).&quot; The \(\$\) sign means &quot;sample uniformly at random&quot; and \(\mathbb{Z}_q\) is just the set of integers modulo \(q\). We&#39;ll use the plain-English version.</p>
+</blockquote>
+<p>The randomness \(r\) is critical—it&#39;s what makes the protocol zero-knowledge. Without it, the verifier could extract \(x\) from a single response.</p>
+<p><strong>Step 2 — Challenge &#40;Verifier → Prover&#41;:</strong></p>
+<p>The verifier picks a random challenge \(e\) uniformly from \(\{1, 2, \ldots, q-1\}\).</p>
+<blockquote>
+<p>The verifier&#39;s challenge is like a pop quiz. The prover committed to \(a\)<em>before</em> seeing the challenge, so they can&#39;t tailor their commitment to a specific question. This is what makes cheating hard. Note the challenge space is \(\{1, \ldots, q-1\}\)—much larger than the coin flip \(\{0, 1\}\) in our warm-up. That&#39;s why Schnorr gets negligible soundness error &#40;\(1/q\)&#41; in a single round.</p>
+</blockquote>
+<p><strong>Step 3 — Response &#40;Prover → Verifier&#41;:</strong></p>
+<p>The prover computes and sends:</p>
+\[z = r + e \cdot x \mod q\]
+<p><strong>Verification:</strong></p>
+<p>The verifier checks:</p>
+\[g^z \stackrel{?}{=} a \cdot y^e \mod p\]
+<h3 id="why_does_verification_work"><a href="#why_does_verification_work" class="header-anchor">Why Does Verification Work?</a></h3>
+<p>Let&#39;s expand the right side:</p>
+\[a \cdot y^e = g^r \cdot (g^x)^e = g^r \cdot g^{xe} = g^{r + xe} = g^z \mod p\]
+<p>The equation holds if and only if \(z = r + ex \mod q\), which only someone who knows \(x\) can compute &#40;given that they committed to \(r\) before seeing \(e\)&#41;.</p>
+<h3 id="why_is_it_zero-knowledge"><a href="#why_is_it_zero-knowledge" class="header-anchor">Why Is It Zero-Knowledge?</a></h3>
+<p>Here&#39;s the simulator argument. The simulator \(\mathcal{S}\) &#40;which does <strong>not</strong> know the secret \(x\)&#41; works as follows:</p>
+<ol>
+<li><p>Pick random \(z\) and \(e\) uniformly from \(\{1, 2, \ldots, q-1\}\)</p>
+</li>
+<li><p>Compute \(a = g^z \cdot y^{-e} \mod p\) &#40;note: working <em>backwards</em> from \(z\) and \(e\) to find \(a\)&#41;</p>
+</li>
+<li><p>Output the transcript \((a, e, z)\)</p>
+</li>
+</ol>
+<p><strong>Check:</strong> Does \(g^z = a \cdot y^e\)?</p>
+\[a \cdot y^e = g^z \cdot y^{-e} \cdot y^e = g^z \quad \checkmark\]
+<p>The simulated transcript has the exact same distribution as a real transcript&#33; The verifier can&#39;t tell the difference. Therefore, the real transcript reveals nothing about \(x\).</p>
+<blockquote>
+<p><strong>Wait—the simulator picks \(e\) and \(z\) first, then computes \(a\) backwards. In the real protocol, \(a\) comes first. Doesn&#39;t the order matter?</strong></p>
+<p>Great catch. In the real protocol, \(a\) is committed <em>before</em> \(e\) is chosen, so the prover can&#39;t cheat. But the simulator doesn&#39;t need to cheat—it&#39;s not trying to extract \(x\). It&#39;s just showing that the <em>final transcript</em> \((a, e, z)\) looks the same regardless of whether \(x\) was used.</p>
+<p>The key property is that <strong>the distribution of transcripts is identical</strong>. The verifier only sees the final \((a, e, z)\), not the order in which values were generated internally.</p>
+</blockquote>
+<h3 id="why_is_it_sound"><a href="#why_is_it_sound" class="header-anchor">Why Is It Sound?</a></h3>
+<p>Recall \(\mathcal{P}^*\) denotes a cheating prover &#40;the star &#61; &quot;malicious, doesn&#39;t follow the rules&quot;&#41;. If \(\mathcal{P}^*\) doesn&#39;t actually know \(x\), they&#39;d need to produce a valid \(z\) for a random \(e\) they haven&#39;t seen yet. Since they committed to \(a = g^r\) before seeing \(e\), they need:</p>
+\[z = r + e \cdot x \mod q\]
+<p>Without knowing \(x\), they can only guess correctly with probability \(1/q\) &#40;negligible for large \(q\)—compare to the warm-up where the cheating probability was \(1/2\) per round&#41;.</p>
+<p>More formally, if a prover can answer two different challenges \(e_1, e_2\) for the same commitment \(a\):</p>
+\[z_1 = r + e_1 \cdot x \mod q\]
+\[z_2 = r + e_2 \cdot x \mod q\]
+<p>Subtracting: \(z_1 - z_2 = (e_1 - e_2) \cdot x \mod q\), so:</p>
+\[x = \frac{z_1 - z_2}{e_1 - e_2} \mod q\]
+<p>This is the <strong>knowledge extractor</strong>—it proves the protocol has the <strong>proof of knowledge</strong> property. If you can answer two challenges, you <em>must</em> know \(x\).</p>
+<hr />
+<h2 id="the_fiat-shamir_heuristic_making_it_non-interactive"><a href="#the_fiat-shamir_heuristic_making_it_non-interactive" class="header-anchor">The Fiat-Shamir Heuristic: Making It Non-Interactive</a></h2>
+<p>Interactive proofs are inconvenient for blockchains—you&#39;d need the verifier to be online and send challenges. The <strong>Fiat-Shamir transform</strong> replaces the verifier&#39;s random challenge with a hash:</p>
+\[e = H(a \| y \| \text{context})\]
+<p>where \(H\) is a cryptographic hash function &#40;like SHA-256&#41;. The idea: a hash function is &quot;random enough&quot; that the prover can&#39;t predict \(e\) before committing to \(a\).</p>
+<p>This turns the 3-move protocol into a single message \((a, z)\) that anyone can verify. This is called a <strong>Non-Interactive Zero-Knowledge &#40;NIZK&#41;</strong> proof.</p>
+<blockquote>
+<p><strong>Why does hashing work as a replacement for the verifier?</strong></p>
+<p>A cryptographic hash function behaves like a <strong>random oracle</strong>—its output is unpredictable unless you know the exact input. Since the prover must commit to \(a\) before computing \(e = H(a \| y)\), and changing \(a\) even slightly completely changes \(e\), the prover can&#39;t &quot;shop around&quot; for a favorable challenge. It&#39;s as if the hash function IS the verifier, asking an unpredictable question based on the prover&#39;s commitment.</p>
+<p><strong>Caveat</strong>: The Fiat-Shamir heuristic is provably secure in the &quot;random oracle model&quot; but not in the standard model. In practice, it works great with real hash functions. Most ZK systems used in production &#40;SNARKs, STARKs&#41; use this transform or something similar.</p>
+</blockquote>
+<hr />
+<h2 id="implementation_in_julia"><a href="#implementation_in_julia" class="header-anchor">Implementation in Julia</a></h2>
+<p>Now the fun part. Let&#39;s build a complete Schnorr ZK proof system in Julia. No external crypto libraries—we&#39;ll do everything from scratch so you can see every moving part.</p>
+<blockquote>
+<p><strong>Why Julia?</strong></p>
+<p>Julia has native big integer support &#40;<code>BigInt</code>&#41;, built-in modular arithmetic via <code>powermod</code>, and the syntax is clean enough that the code reads almost like the math. Plus, if you&#39;re a CS PhD who already knows Julia, you won&#39;t be fighting the language while learning the cryptography.</p>
+</blockquote>
+<h3 id="part_1_parameter_generation"><a href="#part_1_parameter_generation" class="header-anchor">Part 1: Parameter Generation</a></h3>
+<p>First, we need safe cryptographic parameters. We need a prime \(p\) such that \(q = (p-1)/2\) is also prime &#40;a <strong>safe prime</strong>&#41;, and a generator \(g\) of the subgroup of order \(q\).</p>
+<pre><code class="language-julia">using SHA
+using Random
+
+# --- Parameter Generation ---
+
+&quot;&quot;&quot;
+Check if n is probably prime using Miller-Rabin.
+For a toy implementation, k&#61;20 rounds gives error probability &lt; 4^&#123;-20&#125; ≈ 10^&#123;-12&#125;.
+&quot;&quot;&quot;
+function is_probably_prime&#40;n::BigInt; k::Int&#61;20&#41;
+    if n &lt; 2
+        return false
+    end
+    if n &#61;&#61; 2 || n &#61;&#61; 3
+        return true
+    end
+    if iseven&#40;n&#41;
+        return false
+    end
+
+    # Write n-1 &#61; 2^s * d with d odd
+    d &#61; n - 1
+    s &#61; 0
+    while iseven&#40;d&#41;
+        d &gt;&gt;&#61; 1
+        s &#43;&#61; 1
+    end
+
+    # k rounds of Miller-Rabin
+    for _ in 1:k
+        a &#61; rand&#40;big&#40;2&#41;:n-2&#41;
+        x &#61; powermod&#40;a, d, n&#41;
+
+        if x &#61;&#61; 1 || x &#61;&#61; n - 1
+            continue
+        end
+
+        found &#61; false
+        for _ in 1:s-1
+            x &#61; powermod&#40;x, 2, n&#41;
+            if x &#61;&#61; n - 1
+                found &#61; true
+                break
+            end
+        end
+
+        if &#33;found
+            return false
+        end
+    end
+    return true
+end
+
+&quot;&quot;&quot;
+Generate a safe prime p &#61; 2q &#43; 1 where q is also prime.
+&#96;bits&#96; controls the size. Use small values &#40;64-256&#41; for experimentation,
+1024&#43; for anything resembling real security.
+&quot;&quot;&quot;
+function generate_safe_prime&#40;bits::Int&#41;
+    while true
+        # Generate random odd number of appropriate size
+        q &#61; rand&#40;big&#40;2&#41;^&#40;bits-1&#41;:big&#40;2&#41;^bits - 1&#41;
+        if iseven&#40;q&#41;
+            q &#43;&#61; 1
+        end
+
+        if &#33;is_probably_prime&#40;q&#41;
+            continue
+        end
+
+        p &#61; 2q &#43; 1
+        if is_probably_prime&#40;p&#41;
+            return &#40;p&#61;p, q&#61;q&#41;
+        end
+    end
+end
+
+&quot;&quot;&quot;
+Find a generator of the subgroup of order q in Z_p^*.
+If p &#61; 2q &#43; 1 &#40;safe prime&#41;, then for any h in Z_p^*,
+g &#61; h^2 mod p is a generator of the order-q subgroup
+&#40;unless g &#61; 1, which happens with negligible probability&#41;.
+&quot;&quot;&quot;
+function find_generator&#40;p::BigInt, q::BigInt&#41;
+    while true
+        h &#61; rand&#40;big&#40;2&#41;:p-2&#41;
+        g &#61; powermod&#40;h, 2, p&#41;
+        if g &#33;&#61; 1
+            # Verify: g^q mod p should be 1 &#40;g has order q&#41;
+            @assert powermod&#40;g, q, p&#41; &#61;&#61; 1 &quot;Generator check failed&quot;
+            return g
+        end
+    end
+end</code></pre>
+<blockquote>
+<p><strong>Why safe primes?</strong></p>
+<p>A safe prime \(p = 2q + 1\) ensures that the multiplicative group \(\mathbb{Z}_p^*\) &#40;that&#39;s just the set \(\{1, 2, \ldots, p-1\}\) with multiplication mod \(p\)&#41; has a large prime-order subgroup of order \(q\). This matters because:</p>
+<ol>
+<li><p>The discrete log problem is hardest in prime-order subgroups</p>
+</li>
+<li><p>Every element \(g \neq 1\) in this subgroup is a generator &#40;no &quot;weak&quot; generators&#41;</p>
+</li>
+<li><p>The Schnorr protocol&#39;s security proof requires a prime-order group</p>
+</li>
+</ol>
+<p>Without a safe prime, \(p - 1\) could have small factors, and an attacker could use the <a href="https://en.wikipedia.org/wiki/Pohlig&#37;E2&#37;80&#37;93Hellman_algorithm">Pohlig-Hellman algorithm</a> to decompose the discrete log problem into easier sub-problems.</p>
+</blockquote>
+<h3 id="part_2_key_generation_and_the_proof_system"><a href="#part_2_key_generation_and_the_proof_system" class="header-anchor">Part 2: Key Generation and the Proof System</a></h3>
+<pre><code class="language-julia"># --- Data Structures ---
+
+&quot;&quot;&quot;
+Public parameters shared by everyone.
+These define the group we work in.
+&quot;&quot;&quot;
+struct ZKParams
+    p::BigInt  # Safe prime
+    q::BigInt  # Prime order of subgroup &#40;p &#61; 2q &#43; 1&#41;
+    g::BigInt  # Generator of the order-q subgroup
+end
+
+&quot;&quot;&quot;
+A non-interactive Schnorr proof &#40;after Fiat-Shamir&#41;.
+Contains the commitment &#96;a&#96; and the response &#96;z&#96;.
+The challenge &#96;e&#96; is recomputed by the verifier via hashing.
+&quot;&quot;&quot;
+struct SchnorrProof
+    a::BigInt  # Commitment: g^r mod p
+    z::BigInt  # Response: r &#43; e*x mod q
+end
+
+&quot;&quot;&quot;
+Generate a keypair: secret x, public y &#61; g^x mod p.
+&quot;&quot;&quot;
+function keygen&#40;params::ZKParams&#41;
+    x &#61; rand&#40;big&#40;1&#41;:params.q - 1&#41;  # Secret key
+    y &#61; powermod&#40;params.g, x, params.p&#41;  # Public key
+    return &#40;secret&#61;x, public&#61;y&#41;
+end</code></pre>
+<h3 id="part_3_the_fiat-shamir_hash"><a href="#part_3_the_fiat-shamir_hash" class="header-anchor">Part 3: The Fiat-Shamir Hash</a></h3>
+<p>We need a hash function that maps commitments to challenges in \(\mathbb{Z}_q\). We&#39;ll use SHA-256:</p>
+<pre><code class="language-julia">&quot;&quot;&quot;
+Fiat-Shamir challenge: e &#61; H&#40;g, y, a&#41; mod q.
+
+This replaces the verifier&#39;s random challenge in the interactive protocol.
+The hash input includes all public values to prevent cross-protocol attacks.
+&quot;&quot;&quot;
+function fiat_shamir_challenge&#40;params::ZKParams, y::BigInt, a::BigInt&#41;
+    # Concatenate all public values into a byte string
+    data &#61; string&#40;params.g&#41; * &quot;|&quot; * string&#40;y&#41; * &quot;|&quot; * string&#40;a&#41;
+    hash_bytes &#61; sha256&#40;Vector&#123;UInt8&#125;&#40;data&#41;&#41;
+
+    # Convert hash to BigInt and reduce mod q
+    e &#61; parse&#40;BigInt, bytes2hex&#40;hash_bytes&#41;, base&#61;16&#41;
+    return mod&#40;e, params.q&#41;
+end</code></pre>
+<blockquote>
+<p><strong>Why hash all three values \((g, y, a)\)?</strong></p>
+<p>Including \(g\) and \(y\) in the hash prevents <strong>related-key attacks</strong> where a proof for one key is repurposed for another. The hash should bind the challenge to the <em>entire context</em> of the proof. In production systems, you&#39;d also include a domain separator string &#40;like <code>&quot;Schnorr-v1&quot;</code>&#41; to prevent cross-protocol attacks.</p>
+</blockquote>
+<h3 id="part_4_prove_and_verify"><a href="#part_4_prove_and_verify" class="header-anchor">Part 4: Prove and Verify</a></h3>
+<pre><code class="language-julia">&quot;&quot;&quot;
+Generate a Schnorr proof that you know x such that y &#61; g^x mod p.
+
+This is the prover&#39;s algorithm:
+1. Pick random r, compute commitment a &#61; g^r mod p
+2. Compute challenge e &#61; H&#40;g, y, a&#41; mod q  &#40;Fiat-Shamir&#41;
+3. Compute response z &#61; r &#43; e*x mod q
+4. Output proof &#40;a, z&#41;
+&quot;&quot;&quot;
+function prove&#40;params::ZKParams, x::BigInt, y::BigInt&#41;
+    # Step 1: Commitment
+    r &#61; rand&#40;big&#40;1&#41;:params.q - 1&#41;  # Random nonce
+    a &#61; powermod&#40;params.g, r, params.p&#41;
+
+    # Step 2: Challenge &#40;Fiat-Shamir&#41;
+    e &#61; fiat_shamir_challenge&#40;params, y, a&#41;
+
+    # Step 3: Response
+    z &#61; mod&#40;r &#43; e * x, params.q&#41;
+
+    return SchnorrProof&#40;a, z&#41;
+end
+
+&quot;&quot;&quot;
+Verify a Schnorr proof: check that g^z ≡ a · y^e &#40;mod p&#41;.
+
+This is the verifier&#39;s algorithm:
+1. Recompute the challenge e &#61; H&#40;g, y, a&#41; mod q
+2. Check: g^z mod p &#61;&#61; a * y^e mod p
+&quot;&quot;&quot;
+function verify&#40;params::ZKParams, y::BigInt, proof::SchnorrProof&#41;
+    # Recompute challenge
+    e &#61; fiat_shamir_challenge&#40;params, y, proof.a&#41;
+
+    # Verify: g^z ≡ a · y^e &#40;mod p&#41;
+    lhs &#61; powermod&#40;params.g, proof.z, params.p&#41;
+    rhs &#61; mod&#40;proof.a * powermod&#40;y, e, params.p&#41;, params.p&#41;
+
+    return lhs &#61;&#61; rhs
+end</code></pre>
+<h3 id="part_5_lets_run_it"><a href="#part_5_lets_run_it" class="header-anchor">Part 5: Let&#39;s Run It&#33;</a></h3>
+<pre><code class="language-julia">function demo_basic&#40;&#41;
+    println&#40;&quot;&#61;&quot; ^ 60&#41;
+    println&#40;&quot;  Schnorr Zero-Knowledge Proof Demo&quot;&#41;
+    println&#40;&quot;&#61;&quot; ^ 60&#41;
+
+    # Generate parameters &#40;128-bit primes for demo; use 1024&#43; for real security&#41;
+    println&#40;&quot;\n&#91;1&#93; Generating safe prime parameters &#40;128-bit&#41;...&quot;&#41;
+    primes &#61; generate_safe_prime&#40;128&#41;
+    params &#61; ZKParams&#40;primes.p, primes.q, find_generator&#40;primes.p, primes.q&#41;&#41;
+    println&#40;&quot;    p &#61; &#36;&#40;params.p&#41;&quot;&#41;
+    println&#40;&quot;    q &#61; &#36;&#40;params.q&#41;&quot;&#41;
+    println&#40;&quot;    g &#61; &#36;&#40;params.g&#41;&quot;&#41;
+
+    # Generate keypair
+    println&#40;&quot;\n&#91;2&#93; Generating keypair...&quot;&#41;
+    keys &#61; keygen&#40;params&#41;
+    println&#40;&quot;    Secret x &#61; &#36;&#40;keys.secret&#41;&quot;&#41;
+    println&#40;&quot;    Public y &#61; g^x mod p &#61; &#36;&#40;keys.public&#41;&quot;&#41;
+
+    # Generate proof
+    println&#40;&quot;\n&#91;3&#93; Generating proof &#40;proving knowledge of x&#41;...&quot;&#41;
+    proof &#61; prove&#40;params, keys.secret, keys.public&#41;
+    println&#40;&quot;    Commitment a &#61; &#36;&#40;proof.a&#41;&quot;&#41;
+    println&#40;&quot;    Response   z &#61; &#36;&#40;proof.z&#41;&quot;&#41;
+
+    # Verify proof
+    println&#40;&quot;\n&#91;4&#93; Verifying proof...&quot;&#41;
+    result &#61; verify&#40;params, keys.public, proof&#41;
+    println&#40;&quot;    Verification: &#36;&#40;result ? &quot;✅ ACCEPTED&quot; : &quot;❌ REJECTED&quot;&#41;&quot;&#41;
+
+    # Try with wrong key &#40;soundness check&#41;
+    println&#40;&quot;\n&#91;5&#93; Soundness check: verify with wrong public key...&quot;&#41;
+    fake_y &#61; powermod&#40;params.g, rand&#40;big&#40;1&#41;:params.q-1&#41;, params.p&#41;
+    result_fake &#61; verify&#40;params, fake_y, proof&#41;
+    println&#40;&quot;    Verification with wrong key: &#36;&#40;result_fake ? &quot;❌ UNSOUND&#33;&quot; : &quot;✅ REJECTED &#40;correct&#41;&quot;&#41;&quot;&#41;
+
+    println&#40;&quot;\n&quot; * &quot;&#61;&quot; ^ 60&#41;
+end
+
+demo_basic&#40;&#41;</code></pre>
+<p>Running this should produce output like:</p>
+<pre><code class="language-julia">&#61;&#61;&#61;&#61;&#61;&#61;&#61;&#61;&#61;&#61;&#61;&#61;&#61;&#61;&#61;&#61;&#61;&#61;&#61;&#61;&#61;&#61;&#61;&#61;&#61;&#61;&#61;&#61;&#61;&#61;&#61;&#61;&#61;&#61;&#61;&#61;&#61;&#61;&#61;&#61;&#61;&#61;&#61;&#61;&#61;&#61;&#61;&#61;&#61;&#61;&#61;&#61;&#61;&#61;&#61;&#61;&#61;&#61;&#61;&#61;
+  Schnorr Zero-Knowledge Proof Demo
+&#61;&#61;&#61;&#61;&#61;&#61;&#61;&#61;&#61;&#61;&#61;&#61;&#61;&#61;&#61;&#61;&#61;&#61;&#61;&#61;&#61;&#61;&#61;&#61;&#61;&#61;&#61;&#61;&#61;&#61;&#61;&#61;&#61;&#61;&#61;&#61;&#61;&#61;&#61;&#61;&#61;&#61;&#61;&#61;&#61;&#61;&#61;&#61;&#61;&#61;&#61;&#61;&#61;&#61;&#61;&#61;&#61;&#61;&#61;&#61;
+
+&#91;1&#93; Generating safe prime parameters &#40;128-bit&#41;...
+    p &#61; 54890381048102939...
+    q &#61; 27445190524051469...
+    g &#61; 38271940182739401...
+
+&#91;2&#93; Generating keypair...
+    Secret x &#61; 19384710293847102...
+    Public y &#61; g^x mod p &#61; 47261839401827364...
+
+&#91;3&#93; Generating proof &#40;proving knowledge of x&#41;...
+    Commitment a &#61; 29381047291038471...
+    Response   z &#61; 38291047382910473...
+
+&#91;4&#93; Verifying proof...
+    Verification: ✅ ACCEPTED
+
+&#91;5&#93; Soundness check: verify with wrong public key...
+    Verification with wrong key: ✅ REJECTED &#40;correct&#41;
+
+&#61;&#61;&#61;&#61;&#61;&#61;&#61;&#61;&#61;&#61;&#61;&#61;&#61;&#61;&#61;&#61;&#61;&#61;&#61;&#61;&#61;&#61;&#61;&#61;&#61;&#61;&#61;&#61;&#61;&#61;&#61;&#61;&#61;&#61;&#61;&#61;&#61;&#61;&#61;&#61;&#61;&#61;&#61;&#61;&#61;&#61;&#61;&#61;&#61;&#61;&#61;&#61;&#61;&#61;&#61;&#61;&#61;&#61;&#61;&#61;</code></pre>
+<hr />
+<h2 id="going_deeper_multiple_rounds_and_statistical_confidence"><a href="#going_deeper_multiple_rounds_and_statistical_confidence" class="header-anchor">Going Deeper: Multiple Rounds and Statistical Confidence</a></h2>
+<p>A single Schnorr proof already has negligible soundness error &#40;\(1/q\)&#41;, but for simpler protocols &#40;like graph 3-coloring&#41;, you need multiple rounds. Let&#39;s build a generic framework:</p>
+<pre><code class="language-julia">&quot;&quot;&quot;
+Run the Schnorr proof &#96;n&#96; times independently and track statistics.
+
+In Schnorr&#39;s protocol, a single round already has soundness error 1/q &#40;negligible&#41;.
+But this demonstrates the general principle: n independent rounds give
+soundness error &#40;1/q&#41;^n.
+
+For simpler ZK protocols with soundness error 1/2 per round,
+you genuinely need n ≈ 128 rounds for 128-bit security.
+&quot;&quot;&quot;
+function demo_multiple_rounds&#40;n::Int&#61;20&#41;
+    println&#40;&quot;\n&quot; * &quot;&#61;&quot; ^ 60&#41;
+    println&#40;&quot;  Multiple-Round Demonstration &#40;&#36;n rounds&#41;&quot;&#41;
+    println&#40;&quot;&#61;&quot; ^ 60&#41;
+
+    primes &#61; generate_safe_prime&#40;128&#41;
+    params &#61; ZKParams&#40;primes.p, primes.q, find_generator&#40;primes.p, primes.q&#41;&#41;
+    keys &#61; keygen&#40;params&#41;
+
+    accept_count &#61; 0
+    for i in 1:n
+        proof &#61; prove&#40;params, keys.secret, keys.public&#41;
+        if verify&#40;params, keys.public, proof&#41;
+            accept_count &#43;&#61; 1
+        end
+    end
+
+    println&#40;&quot;  Honest prover: &#36;accept_count / &#36;n rounds accepted&quot;&#41;
+    println&#40;&quot;  &#40;Should be &#36;n / &#36;n — completeness&#41;&quot;&#41;
+
+    # Now try cheating: prover doesn&#39;t know x, tries random z
+    cheat_count &#61; 0
+    for i in 1:n
+        # Cheating prover: picks random a and z, hopes for the best
+        fake_a &#61; powermod&#40;params.g, rand&#40;big&#40;1&#41;:params.q-1&#41;, params.p&#41;
+        fake_z &#61; rand&#40;big&#40;1&#41;:params.q - 1&#41;
+        fake_proof &#61; SchnorrProof&#40;fake_a, fake_z&#41;
+        if verify&#40;params, keys.public, fake_proof&#41;
+            cheat_count &#43;&#61; 1
+        end
+    end
+
+    println&#40;&quot;  Cheating prover: &#36;cheat_count / &#36;n rounds accepted&quot;&#41;
+    println&#40;&quot;  &#40;Should be ≈ 0 — soundness&#41;&quot;&#41;
+    println&#40;&quot;  Probability of cheating: 1/q ≈ &#36;&#40;Float64&#40;1/BigFloat&#40;params.q&#41;&#41;&#41;&quot;&#41;
+    println&#40;&quot;&#61;&quot; ^ 60&#41;
+end
+
+demo_multiple_rounds&#40;50&#41;</code></pre>
+<hr />
+<h2 id="experiment_1_what_happens_if_the_prover_reuses_randomness"><a href="#experiment_1_what_happens_if_the_prover_reuses_randomness" class="header-anchor">Experiment 1: What Happens If the Prover Reuses Randomness?</a></h2>
+<p>This is a classic cryptographic catastrophe. If the prover uses the same \(r\) for two different proofs, the secret key leaks&#33;</p>
+<pre><code class="language-julia">&quot;&quot;&quot;
+Demonstrate the CRITICAL importance of fresh randomness.
+
+If the prover reuses the same nonce r for two proofs with different
+challenges e₁ and e₂, an attacker can extract the secret key:
+
+    z₁ &#61; r &#43; e₁·x mod q
+    z₂ &#61; r &#43; e₂·x mod q
+    ───────────────────
+    z₁ - z₂ &#61; &#40;e₁ - e₂&#41;·x mod q
+    x &#61; &#40;z₁ - z₂&#41; · &#40;e₁ - e₂&#41;⁻¹ mod q
+
+This is EXACTLY what happened to Sony&#39;s PlayStation 3 ECDSA signing key
+in 2010 — they used a fixed random number, and hackers extracted the
+private key, allowing them to sign arbitrary code.
+&quot;&quot;&quot;
+function demo_nonce_reuse_attack&#40;&#41;
+    println&#40;&quot;\n&quot; * &quot;&#61;&quot; ^ 60&#41;
+    println&#40;&quot;  ⚠️  Nonce Reuse Attack Demo&quot;&#41;
+    println&#40;&quot;&#61;&quot; ^ 60&#41;
+
+    primes &#61; generate_safe_prime&#40;128&#41;
+    params &#61; ZKParams&#40;primes.p, primes.q, find_generator&#40;primes.p, primes.q&#41;&#41;
+    keys &#61; keygen&#40;params&#41;
+    println&#40;&quot;  Secret key x &#61; &#36;&#40;keys.secret&#41;&quot;&#41;
+
+    # Prover MISTAKENLY reuses the same r for two proofs
+    r &#61; rand&#40;big&#40;1&#41;:params.q - 1&#41;  # Same r used twice&#33;
+    a &#61; powermod&#40;params.g, r, params.p&#41;  # Same commitment
+
+    # But we compute e differently by adding context to change the hash.
+    # In practice, this happens when signing two different messages
+    # with the same nonce.
+
+    # Proof 1: standard
+    e1 &#61; fiat_shamir_challenge&#40;params, keys.public, a&#41;
+    z1 &#61; mod&#40;r &#43; e1 * keys.secret, params.q&#41;
+
+    # Proof 2: simulate a different challenge by using a different &quot;context&quot;
+    # &#40;In reality, this happens when you sign a different message with same r&#41;
+    data2 &#61; string&#40;params.g&#41; * &quot;|&quot; * string&#40;keys.public&#41; * &quot;|&quot; * string&#40;a&#41; * &quot;|msg2&quot;
+    hash2 &#61; sha256&#40;Vector&#123;UInt8&#125;&#40;data2&#41;&#41;
+    e2 &#61; mod&#40;parse&#40;BigInt, bytes2hex&#40;hash2&#41;, base&#61;16&#41;, params.q&#41;
+    z2 &#61; mod&#40;r &#43; e2 * keys.secret, params.q&#41;
+
+    println&#40;&quot;\n  Attacker observes two proofs with same commitment a:&quot;&#41;
+    println&#40;&quot;    Proof 1: &#40;a, e₁&#61;&#36;&#40;e1&#41;, z₁&#61;&#36;&#40;z1&#41;&#41;&quot;&#41;
+    println&#40;&quot;    Proof 2: &#40;a, e₂&#61;&#36;&#40;e2&#41;, z₂&#61;&#36;&#40;z2&#41;&#41;&quot;&#41;
+
+    # Attack: extract x from the two transcripts
+    delta_z &#61; mod&#40;z1 - z2, params.q&#41;
+    delta_e &#61; mod&#40;e1 - e2, params.q&#41;
+    x_recovered &#61; mod&#40;delta_z * invmod&#40;delta_e, params.q&#41;, params.q&#41;
+
+    println&#40;&quot;\n  Attack computation:&quot;&#41;
+    println&#40;&quot;    z₁ - z₂ &#61; &#36;delta_z&quot;&#41;
+    println&#40;&quot;    e₁ - e₂ &#61; &#36;delta_e&quot;&#41;
+    println&#40;&quot;    x &#61; &#40;z₁ - z₂&#41; · &#40;e₁ - e₂&#41;⁻¹ mod q &#61; &#36;x_recovered&quot;&#41;
+    println&#40;&quot;\n  Recovered secret: &#36;x_recovered&quot;&#41;
+    println&#40;&quot;  Actual secret:    &#36;&#40;keys.secret&#41;&quot;&#41;
+    println&#40;&quot;  Match: &#36;&#40;x_recovered &#61;&#61; keys.secret ? &quot;🔓 SECRET KEY EXTRACTED&#33;&quot; : &quot;Safe&quot;&#41;&quot;&#41;
+
+    println&#40;&quot;\n  Lesson: NEVER reuse the random nonce r.&quot;&#41;
+    println&#40;&quot;  This is why RFC 6979 exists — deterministic nonce generation.&quot;&#41;
+    println&#40;&quot;&#61;&quot; ^ 60&#41;
+end
+
+demo_nonce_reuse_attack&#40;&#41;</code></pre>
+<blockquote>
+<p><strong>This is not hypothetical.</strong> In 2010, <a href="https://fail0verflow.com/">fail0verflow</a> discovered that Sony used a <em>constant</em> random nonce \(r\) in their ECDSA implementation for PS3 game signing. The group extracted Sony&#39;s private key, enabling arbitrary code signing. The mathematical attack is <em>identical</em> to what the code above demonstrates.</p>
+</blockquote>
+<hr />
+<h2 id="experiment_2_an_or_proof_proving_you_know_one_of_two_secrets"><a href="#experiment_2_an_or_proof_proving_you_know_one_of_two_secrets" class="header-anchor">Experiment 2: An &quot;OR&quot; Proof — Proving You Know <em>One Of Two</em> Secrets</a></h2>
+<p>In practice, you often want to prove disjunctions: &quot;I know the secret for account A <strong>or</strong> account B, but I won&#39;t tell you which.&quot; This is the basis of <strong>ring signatures</strong> &#40;used in Monero for transaction privacy&#41;.</p>
+<p>The idea: if you know \(x_1\) &#40;the discrete log of \(y_1\)&#41; but not \(x_2\) &#40;for \(y_2\)&#41;, you can <em>simulate</em> the proof for \(y_2\) and give a real proof for \(y_1\), such that the verifier can&#39;t tell which leg is real.</p>
+<pre><code class="language-julia">&quot;&quot;&quot;
+OR-Proof: Prove knowledge of x₁ OR x₂ &#40;for y₁ &#61; g^x₁ or y₂ &#61; g^x₂&#41;
+without revealing WHICH one you know.
+
+Construction &#40;Cramer-Damgård-Schoenmakers &#39;94&#41;:
+
+The prover knows x₁ &#40;WLOG&#41;. They:
+1. Simulate the proof for y₂: pick random z₂, e₂, compute a₂ &#61; g^z₂ · y₂^&#40;-e₂&#41;
+2. Give a real commitment for y₁: pick random r₁, compute a₁ &#61; g^r₁
+3. Compute the combined challenge: e &#61; H&#40;a₁, a₂&#41;
+4. Set e₁ &#61; e - e₂ mod q &#40;so e₁ &#43; e₂ &#61; e&#41;
+5. Compute z₁ &#61; r₁ &#43; e₁·x₁ mod q
+
+The verifier checks:
+- g^z₁ &#61; a₁ · y₁^e₁ &#40;real proof&#41;
+- g^z₂ &#61; a₂ · y₂^e₂ &#40;simulated, but verifier can&#39;t tell&#33;&#41;
+- e₁ &#43; e₂ &#61; H&#40;a₁, a₂&#41;   &#40;challenges sum to the hash&#41;
+&quot;&quot;&quot;
+struct ORProof
+    a1::BigInt
+    a2::BigInt
+    e1::BigInt
+    e2::BigInt
+    z1::BigInt
+    z2::BigInt
+end
+
+function prove_or&#40;params::ZKParams, x1::BigInt, y1::BigInt, y2::BigInt&#41;
+    # Simulate proof for y2 &#40;we DON&#39;T know x2&#41;
+    z2 &#61; rand&#40;big&#40;1&#41;:params.q - 1&#41;
+    e2 &#61; rand&#40;big&#40;1&#41;:params.q - 1&#41;
+    # a2 &#61; g^z2 * y2^&#40;-e2&#41; mod p  &#40;reverse-engineered to make verification pass&#41;
+    a2 &#61; mod&#40;powermod&#40;params.g, z2, params.p&#41; * powermod&#40;y2, params.q - e2, params.p&#41;, params.p&#41;
+
+    # Real proof for y1 &#40;we DO know x1&#41;
+    r1 &#61; rand&#40;big&#40;1&#41;:params.q - 1&#41;
+    a1 &#61; powermod&#40;params.g, r1, params.p&#41;
+
+    # Combined challenge
+    data &#61; string&#40;a1&#41; * &quot;|&quot; * string&#40;a2&#41; * &quot;|&quot; * string&#40;y1&#41; * &quot;|&quot; * string&#40;y2&#41;
+    hash_bytes &#61; sha256&#40;Vector&#123;UInt8&#125;&#40;data&#41;&#41;
+    e &#61; mod&#40;parse&#40;BigInt, bytes2hex&#40;hash_bytes&#41;, base&#61;16&#41;, params.q&#41;
+
+    # Split challenge: e1 &#61; e - e2, so e1 &#43; e2 &#61; e
+    e1 &#61; mod&#40;e - e2, params.q&#41;
+
+    # Real response
+    z1 &#61; mod&#40;r1 &#43; e1 * x1, params.q&#41;
+
+    return ORProof&#40;a1, a2, e1, e2, z1, z2&#41;
+end
+
+function verify_or&#40;params::ZKParams, y1::BigInt, y2::BigInt, proof::ORProof&#41;
+    # Recompute combined challenge
+    data &#61; string&#40;proof.a1&#41; * &quot;|&quot; * string&#40;proof.a2&#41; * &quot;|&quot; * string&#40;y1&#41; * &quot;|&quot; * string&#40;y2&#41;
+    hash_bytes &#61; sha256&#40;Vector&#123;UInt8&#125;&#40;data&#41;&#41;
+    e &#61; mod&#40;parse&#40;BigInt, bytes2hex&#40;hash_bytes&#41;, base&#61;16&#41;, params.q&#41;
+
+    # Check challenge split
+    if mod&#40;proof.e1 &#43; proof.e2, params.q&#41; &#33;&#61; e
+        return false
+    end
+
+    # Check both legs
+    lhs1 &#61; powermod&#40;params.g, proof.z1, params.p&#41;
+    rhs1 &#61; mod&#40;proof.a1 * powermod&#40;y1, proof.e1, params.p&#41;, params.p&#41;
+
+    lhs2 &#61; powermod&#40;params.g, proof.z2, params.p&#41;
+    rhs2 &#61; mod&#40;proof.a2 * powermod&#40;y2, proof.e2, params.p&#41;, params.p&#41;
+
+    return lhs1 &#61;&#61; rhs1 &amp;&amp; lhs2 &#61;&#61; rhs2
+end
+
+function demo_or_proof&#40;&#41;
+    println&#40;&quot;\n&quot; * &quot;&#61;&quot; ^ 60&#41;
+    println&#40;&quot;  OR-Proof Demo: \&quot;I know x₁ OR x₂\&quot;&quot;&#41;
+    println&#40;&quot;&#61;&quot; ^ 60&#41;
+
+    primes &#61; generate_safe_prime&#40;128&#41;
+    params &#61; ZKParams&#40;primes.p, primes.q, find_generator&#40;primes.p, primes.q&#41;&#41;
+
+    # Two keypairs — prover only knows x1
+    keys1 &#61; keygen&#40;params&#41;
+    keys2 &#61; keygen&#40;params&#41;
+
+    println&#40;&quot;  Prover knows: x₁ &#61; &#36;&#40;keys1.secret&#41;&quot;&#41;
+    println&#40;&quot;  Prover does NOT know x₂&quot;&#41;
+    println&#40;&quot;  Public keys: y₁ &#61; &#36;&#40;keys1.public&#41;&quot;&#41;
+    println&#40;&quot;               y₂ &#61; &#36;&#40;keys2.public&#41;&quot;&#41;
+
+    # Generate OR proof
+    proof &#61; prove_or&#40;params, keys1.secret, keys1.public, keys2.public&#41;
+
+    # Verify
+    result &#61; verify_or&#40;params, keys1.public, keys2.public, proof&#41;
+    println&#40;&quot;\n  Verification: &#36;&#40;result ? &quot;✅ ACCEPTED&quot; : &quot;❌ REJECTED&quot;&#41;&quot;&#41;
+    println&#40;&quot;  The verifier is convinced the prover knows x₁ or x₂,&quot;&#41;
+    println&#40;&quot;  but CANNOT tell which one&#33;&quot;&#41;
+
+    println&#40;&quot;&#61;&quot; ^ 60&#41;
+end
+
+demo_or_proof&#40;&#41;</code></pre>
+<blockquote>
+<p><strong>Why is this useful on blockchains?</strong></p>
+<p>Ring signatures &#40;used in Monero&#41; are essentially OR-proofs over all possible signers. When you spend Monero, you prove &quot;I own one of these 11 outputs&quot; without revealing which one. The verifier &#40;the network&#41; is convinced the transaction is authorized, but can&#39;t link it to your specific account. This is privacy through <em>plausible deniability</em>.</p>
+</blockquote>
+<hr />
+<h2 id="experiment_3_pedersen_commitments_hiding_and_binding"><a href="#experiment_3_pedersen_commitments_hiding_and_binding" class="header-anchor">Experiment 3: Pedersen Commitments — Hiding and Binding</a></h2>
+<p>Before we go further, we need <strong>commitments</strong>—a way to &quot;lock in&quot; a value without revealing it, then open it later. Pedersen commitments are the building block of most ZK systems.</p>
+<pre><code class="language-julia">&quot;&quot;&quot;
+Pedersen Commitment Scheme.
+
+Setup: Two generators g, h of the order-q subgroup, where nobody knows
+log_g&#40;h&#41; &#40;the discrete log of h base g&#41;. If someone knew it, they could
+open commitments to different values — breaking the binding property.
+
+Commit&#40;v, r&#41; &#61; g^v · h^r mod p
+
+Properties:
+- Hiding:  Given C, you can&#39;t determine v &#40;because r is random&#41;
+- Binding: You can&#39;t find &#40;v&#39;, r&#39;&#41; ≠ &#40;v, r&#41; with Commit&#40;v,r&#41; &#61; Commit&#40;v&#39;,r&#39;&#41;
+           &#40;unless you know log_g&#40;h&#41;, which is hard&#41;
+
+This is an information-theoretically hiding, computationally binding scheme.
+&quot;&quot;&quot;
+struct PedersenParams
+    p::BigInt
+    q::BigInt
+    g::BigInt
+    h::BigInt  # Second generator, nobody knows log_g&#40;h&#41;
+end
+
+struct Commitment
+    C::BigInt    # The commitment value g^v · h^r mod p
+    v::BigInt    # The committed value &#40;secret until opening&#41;
+    r::BigInt    # The randomness &#40;secret until opening&#41;
+end
+
+function setup_pedersen&#40;bits::Int&#61;128&#41;
+    primes &#61; generate_safe_prime&#40;bits&#41;
+    p, q &#61; primes.p, primes.q
+    g &#61; find_generator&#40;p, q&#41;
+    h &#61; find_generator&#40;p, q&#41;  # Independent generator
+
+    return PedersenParams&#40;p, q, g, h&#41;
+end
+
+function commit&#40;pp::PedersenParams, v::BigInt&#41;
+    r &#61; rand&#40;big&#40;1&#41;:pp.q - 1&#41;
+    C &#61; mod&#40;powermod&#40;pp.g, v, pp.p&#41; * powermod&#40;pp.h, r, pp.p&#41;, pp.p&#41;
+    return Commitment&#40;C, v, r&#41;
+end
+
+function open_commitment&#40;pp::PedersenParams, com::Commitment&#41;
+    # Verify: C &#61;&#61; g^v · h^r mod p
+    expected &#61; mod&#40;powermod&#40;pp.g, com.v, pp.p&#41; * powermod&#40;pp.h, com.r, pp.p&#41;, pp.p&#41;
+    return com.C &#61;&#61; expected
+end
+
+&quot;&quot;&quot;
+The magic property: Pedersen commitments are ADDITIVELY HOMOMORPHIC.
+
+    Commit&#40;v₁, r₁&#41; · Commit&#40;v₂, r₂&#41; &#61; Commit&#40;v₁ &#43; v₂, r₁ &#43; r₂&#41;
+
+Proof:
+    g^v₁ · h^r₁ · g^v₂ · h^r₂ &#61; g^&#40;v₁&#43;v₂&#41; · h^&#40;r₁&#43;r₂&#41;
+
+This means you can ADD committed values without opening them&#33;
+This is the foundation of confidential transactions.
+&quot;&quot;&quot;
+function demo_pedersen&#40;&#41;
+    println&#40;&quot;\n&quot; * &quot;&#61;&quot; ^ 60&#41;
+    println&#40;&quot;  Pedersen Commitments Demo&quot;&#41;
+    println&#40;&quot;&#61;&quot; ^ 60&#41;
+
+    pp &#61; setup_pedersen&#40;128&#41;
+
+    # Commit to two values
+    v1 &#61; big&#40;42&#41;
+    v2 &#61; big&#40;58&#41;
+    com1 &#61; commit&#40;pp, v1&#41;
+    com2 &#61; commit&#40;pp, v2&#41;
+
+    println&#40;&quot;  Committed to v₁ &#61; &#36;v1 &#40;commitment: &#36;&#40;com1.C&#41;&#41;&quot;&#41;
+    println&#40;&quot;  Committed to v₂ &#61; &#36;v2 &#40;commitment: &#36;&#40;com2.C&#41;&#41;&quot;&#41;
+
+    # Verify openings
+    println&#40;&quot;\n  Opening commitments...&quot;&#41;
+    println&#40;&quot;  com1 valid: &#36;&#40;open_commitment&#40;pp, com1&#41; ? &quot;✅&quot; : &quot;❌&quot;&#41;&quot;&#41;
+    println&#40;&quot;  com2 valid: &#36;&#40;open_commitment&#40;pp, com2&#41; ? &quot;✅&quot; : &quot;❌&quot;&#41;&quot;&#41;
+
+    # Homomorphic addition: multiply commitments
+    C_sum &#61; mod&#40;com1.C * com2.C, pp.p&#41;
+    r_sum &#61; mod&#40;com1.r &#43; com2.r, pp.q&#41;
+    v_sum &#61; v1 &#43; v2
+
+    # Verify the sum commitment
+    expected_sum &#61; mod&#40;powermod&#40;pp.g, v_sum, pp.p&#41; * powermod&#40;pp.h, r_sum, pp.p&#41;, pp.p&#41;
+
+    println&#40;&quot;\n  Homomorphic addition &#40;without opening&#33;&#41;:&quot;&#41;
+    println&#40;&quot;  C₁ · C₂ mod p &#61; &#36;C_sum&quot;&#41;
+    println&#40;&quot;  Commit&#40;v₁&#43;v₂, r₁&#43;r₂&#41; &#61; &#36;expected_sum&quot;&#41;
+    println&#40;&quot;  Match: &#36;&#40;C_sum &#61;&#61; expected_sum ? &quot;✅ Homomorphism works&#33;&quot; : &quot;❌&quot;&#41;&quot;&#41;
+    println&#40;&quot;\n  v₁ &#43; v₂ &#61; &#36;v_sum — but the verifier never saw v₁ or v₂&#33;&quot;&#41;
+
+    println&#40;&quot;&#61;&quot; ^ 60&#41;
+end
+
+demo_pedersen&#40;&#41;</code></pre>
+<blockquote>
+<p><strong>Why does homomorphic commitment matter for blockchains?</strong></p>
+<p>In <strong>confidential transactions</strong> &#40;Monero, Mimblewimble/Grin&#41;, amounts are replaced by Pedersen commitments. A transaction looks like:</p>
+</blockquote>
+\[C_{\text{input}_1} + C_{\text{input}_2} = C_{\text{output}_1} + C_{\text{output}_2} + C_{\text{fee}}\]
+<blockquote>
+<p>Validators check that commitments balance &#40;inputs &#61; outputs &#43; fee&#41; <em>without knowing any amounts</em>. They verify the equation using only the commitments. Combined with range proofs &#40;proving committed values are non-negative&#41;, this gives full transaction privacy.</p>
+</blockquote>
+<hr />
+<h2 id="experiment_4_a_range_proof_sketch"><a href="#experiment_4_a_range_proof_sketch" class="header-anchor">Experiment 4: A Range Proof Sketch</a></h2>
+<p>A <strong>range proof</strong> proves that a committed value \(v\) lies in \([0, 2^n)\) without revealing \(v\). This is critical for confidential transactions—without it, someone could commit to a negative number and create money out of thin air.</p>
+<p>The simplest approach: prove each bit of \(v\) is 0 or 1, and that they assemble to \(v\).</p>
+<pre><code class="language-julia">&quot;&quot;&quot;
+Simple &#40;naive&#41; range proof: prove that a committed value v is in &#91;0, 2^n&#41;.
+
+Idea: Decompose v into bits v &#61; b₀ &#43; 2b₁ &#43; 4b₂ &#43; ... &#43; 2^&#40;n-1&#41;·b_&#123;n-1&#125;
+and prove each bᵢ ∈ &#123;0, 1&#125; using an OR-proof.
+
+A commitment to bᵢ ∈ &#123;0,1&#125; can be proven by showing:
+  Commit&#40;bᵢ, rᵢ&#41; &#61; g^bᵢ · h^rᵢ is a commitment to 0 OR 1.
+
+If bᵢ &#61; 0: C &#61; h^rᵢ          &#40;so C/g⁰ &#61; h^rᵢ — commitment to 0&#41;
+If bᵢ &#61; 1: C &#61; g · h^rᵢ      &#40;so C/g¹ &#61; h^rᵢ — commitment to 1&#41;
+
+We prove: C is a commitment to 0 OR C/g is a commitment to 0.
+This is an OR-proof on the discrete log of C &#40;or C/g&#41; base h.
+
+Note: This is a SIMPLIFIED version. Production systems use Bulletproofs
+or similar for logarithmic proof size.
+&quot;&quot;&quot;
+function demo_range_proof&#40;&#41;
+    println&#40;&quot;\n&quot; * &quot;&#61;&quot; ^ 60&#41;
+    println&#40;&quot;  Range Proof Sketch &#40;8-bit&#41;&quot;&#41;
+    println&#40;&quot;&#61;&quot; ^ 60&#41;
+
+    pp &#61; setup_pedersen&#40;128&#41;
+    n_bits &#61; 8  # Prove v ∈ &#91;0, 256&#41;
+
+    v &#61; big&#40;173&#41;  # Secret value to prove is in range
+    println&#40;&quot;  Secret value: v &#61; &#36;v&quot;&#41;
+    println&#40;&quot;  Proving v ∈ &#91;0, &#36;&#40;2^n_bits&#41;&#41; without revealing v&quot;&#41;
+
+    # Bit decomposition
+    bits &#61; digits&#40;Int&#40;v&#41;, base&#61;2, pad&#61;n_bits&#41;  # LSB first
+    println&#40;&quot;  Bit decomposition: &#36;&#40;reverse&#40;bits&#41;&#41; &#40;MSB first&#41;&quot;&#41;
+
+    # Commit to each bit
+    bit_commitments &#61; &#91;&#93;
+    for i in 1:n_bits
+        com &#61; commit&#40;pp, big&#40;bits&#91;i&#93;&#41;&#41;
+        push&#33;&#40;bit_commitments, com&#41;
+    end
+
+    # Verify: reconstruct v from bit commitments using homomorphism
+    # v &#61; Σ 2^i · bᵢ, so Commit&#40;v, r_total&#41; &#61; Π Commit&#40;bᵢ, rᵢ&#41;^&#40;2^i&#41;
+    C_reconstructed &#61; big&#40;1&#41;
+    r_total &#61; big&#40;0&#41;
+    for i in 1:n_bits
+        power &#61; big&#40;2&#41;^&#40;i-1&#41;
+        C_reconstructed &#61; mod&#40;C_reconstructed * powermod&#40;bit_commitments&#91;i&#93;.C, power, pp.p&#41;, pp.p&#41;
+        r_total &#61; mod&#40;r_total &#43; power * bit_commitments&#91;i&#93;.r, pp.q&#41;
+    end
+
+    # This should equal Commit&#40;v, r_total&#41;
+    C_v &#61; mod&#40;powermod&#40;pp.g, v, pp.p&#41; * powermod&#40;pp.h, r_total, pp.p&#41;, pp.p&#41;
+
+    println&#40;&quot;\n  Reconstructed commitment from bits: &#36;C_reconstructed&quot;&#41;
+    println&#40;&quot;  Direct commitment to v&#61;&#36;v:          &#36;C_v&quot;&#41;
+    println&#40;&quot;  Match: &#36;&#40;C_reconstructed &#61;&#61; C_v ? &quot;✅ Bit decomposition is consistent&#33;&quot; : &quot;❌&quot;&#41;&quot;&#41;
+
+    # In a full implementation, we&#39;d also include OR-proofs for each bit
+    # showing bᵢ ∈ &#123;0, 1&#125;. This is where Bulletproofs dramatically
+    # improve efficiency — from O&#40;n&#41; proofs to O&#40;log n&#41;.
+
+    println&#40;&quot;\n  In a full range proof, we&#39;d also provide &#36;&#40;n_bits&#41; OR-proofs&quot;&#41;
+    println&#40;&quot;  showing each bit ∈ &#123;0,1&#125;. Total proof size: O&#40;&#36;n_bits&#41;.&quot;&#41;
+    println&#40;&quot;  Bulletproofs reduce this to O&#40;log₂&#40;&#36;n_bits&#41;&#41; &#61; O&#40;&#36;&#40;Int&#40;ceil&#40;log2&#40;n_bits&#41;&#41;&#41;&#41;&#41;.&quot;&#41;
+
+    println&#40;&quot;&#61;&quot; ^ 60&#41;
+end
+
+demo_range_proof&#40;&#41;</code></pre>
+<hr />
+<h2 id="the_landscape_where_does_this_fit_in_zk_technology"><a href="#the_landscape_where_does_this_fit_in_zk_technology" class="header-anchor">The Landscape: Where Does This Fit in ZK Technology?</a></h2>
+<p>What we built above &#40;Schnorr proofs, OR-proofs, Pedersen commitments, range proofs&#41; are the <strong>classical</strong> building blocks. Modern ZK systems build on these ideas but scale them dramatically:</p>
+<table><tr><th align="right">System</th><th align="right">Proof Size</th><th align="right">Verify Time</th><th align="right">Trusted Setup?</th><th align="right">Math Foundation</th></tr><tr><td align="right"><strong>Schnorr</strong> &#40;what we built&#41;</td><td align="right">\(O(1)\) elements</td><td align="right">\(O(1)\) exponentiations</td><td align="right">No</td><td align="right">Discrete log</td></tr><tr><td align="right"><strong>Bulletproofs</strong></td><td align="right">\(O(\log n)\)</td><td align="right">\(O(n)\)</td><td align="right">No</td><td align="right">Discrete log &#43; inner product</td></tr><tr><td align="right"><strong>Groth16 &#40;SNARKs&#41;</strong></td><td align="right">3 group elements &#40;~200 bytes&#33;&#41;</td><td align="right">3 pairings &#40;milliseconds&#41;</td><td align="right"><strong>Yes</strong> &#40;toxic waste&#41;</td><td align="right">Bilinear pairings, QAP</td></tr><tr><td align="right"><strong>PLONK</strong></td><td align="right">~500 bytes</td><td align="right">Fast</td><td align="right">Universal &#40;updatable&#41;</td><td align="right">Polynomial commitments</td></tr><tr><td align="right"><strong>STARKs</strong></td><td align="right">\(O(\log^2 n)\) &#40;~100 KB&#41;</td><td align="right">\(O(\log^2 n)\)</td><td align="right"><strong>No</strong></td><td align="right">Hash functions, FRI</td></tr></table>
+<blockquote>
+<p><strong>What&#39;s the &quot;trusted setup&quot; problem?</strong></p>
+<p>Some ZK systems &#40;Groth16&#41; require generating public parameters using secret randomness that must be destroyed afterward. If anyone keeps this &quot;toxic waste,&quot; they can forge proofs. This is a trust assumption that many systems try to eliminate:</p>
+<ul>
+<li><p><strong>STARKs</strong>: No trusted setup at all &#40;transparent&#41;</p>
+</li>
+<li><p><strong>PLONK</strong>: Universal setup &#40;one ceremony works for all circuits&#41;</p>
+</li>
+<li><p><strong>Bulletproofs</strong>: No trusted setup</p>
+</li>
+</ul>
+<p>The trend is moving away from trusted setups entirely.</p>
+</blockquote>
+<h3 id="the_modern_zk_stack_whats_actually_used_in_production"><a href="#the_modern_zk_stack_whats_actually_used_in_production" class="header-anchor">The Modern ZK Stack &#40;What&#39;s Actually Used in Production&#41;</a></h3>
+<pre><code class="language-julia">Application Layer
+├── zkSync Era &#40;ZK-Rollup on Ethereum, uses PLONK&#41;
+├── StarkNet &#40;ZK-Rollup, uses STARKs&#41;
+├── Zcash &#40;private transactions, uses Groth16/Halo2&#41;
+└── Mina Protocol &#40;succinct blockchain, uses Kimchi/PLONK&#41;
+
+Circuit Languages &#40;how you write ZK programs&#41;
+├── Circom &#40;domain-specific, compiles to R1CS&#41;
+├── Noir &#40;Rust-like, by Aztec&#41;
+├── Cairo &#40;for STARKs, by StarkWare&#41;
+├── Leo &#40;for Aleo, privacy-focused&#41;
+└── Halo2 &#40;Rust library, by Zcash/EFF&#41;
+
+Proof Systems &#40;the math engines&#41;
+├── Groth16 — smallest proofs, needs trusted setup
+├── PLONK — universal setup, good balance
+├── STARKs — no setup, quantum-resistant, large proofs
+└── Bulletproofs — no setup, but slow verification</code></pre>
+<hr />
+<h2 id="summary_of_the_math"><a href="#summary_of_the_math" class="header-anchor">Summary of the Math</a></h2>
+<p>Let&#39;s collect all the formal objects in one place:</p>
+<p><strong>Schnorr Protocol</strong> &#40;where \(x\) is the secret, \(y = g^x \bmod p\) is the public value, \(q\) is the group order&#41;:</p>
+\[\text{Setup: } x \in \{1, \ldots, q-1\}, \quad y = g^x \bmod p\]
+\[\text{Prove: pick random } r, \quad a = g^r \bmod p, \quad e = H(g, y, a) \bmod q, \quad z = r + ex \bmod q\]
+\[\text{Verify: } g^z \stackrel{?}{=} a \cdot y^e \pmod{p}\]
+<p><strong>Pedersen Commitment:</strong></p>
+\[C(v, r) = g^v \cdot h^r \bmod p\]
+\[\text{Homomorphism: } C(v_1, r_1) \cdot C(v_2, r_2) = C(v_1 + v_2, r_1 + r_2)\]
+<p><strong>Soundness Extraction &#40;from two transcripts with same \(a\)&#41;:</strong></p>
+\[x = (z_1 - z_2)(e_1 - e_2)^{-1} \bmod q\]
+<p><strong>Fiat-Shamir Transform &#40;interactive → non-interactive&#41;:</strong></p>
+\[e_{\text{interactive}} \text{ (random from } \{1,\ldots,q-1\}\text{)} \quad \longrightarrow \quad e_{\text{non-interactive}} = H(a \| \text{public inputs}) \bmod q\]
+<hr />
+<h2 id="what_to_explore_next"><a href="#what_to_explore_next" class="header-anchor">What To Explore Next</a></h2>
+<p>Now that you have a working toy ZK system, here are directions to push it:</p>
+<ol>
+<li><p><strong>Implement Bulletproofs</strong>: Replace the naive range proof with a logarithmic-size inner product argument. This is a significant step up but uses the same Pedersen commitments.</p>
+</li>
+<li><p><strong>Build a ZK Sudoku Verifier</strong>: Prove you know a Sudoku solution without revealing it. This requires encoding the Sudoku constraints as a set of equations and proving them in zero-knowledge.</p>
+</li>
+<li><p><strong>Explore Polynomial Commitments</strong>: The foundation of PLONK and modern SNARKs. Commit to a polynomial \(f(x)\), then prove evaluations \(f(a) = b\) without revealing \(f\).</p>
+</li>
+<li><p><strong>Try Circom &#43; snarkjs</strong>: If you want to go from toy to production, <a href="https://docs.circom.io/">Circom</a> lets you write ZK circuits that compile to actual SNARK proofs you can verify on Ethereum.</p>
+</li>
+<li><p><strong>Read the Papers</strong>:</p>
+<ul>
+<li><p>Schnorr, 1991: <em>Efficient Signature Generation by Smart Cards</em></p>
+</li>
+<li><p>Pedersen, 1991: <em>Non-Interactive and Information-Theoretic Secure Verifiable Secret Sharing</em></p>
+</li>
+<li><p>Bünz et al., 2018: <em>Bulletproofs: Short Proofs for Confidential Transactions and More</em></p>
+</li>
+<li><p>Gabizon, Williamson, Ciobotaru, 2019: <em>PLONK</em></p>
+</li>
+</ul>
+</li>
+</ol>
+<p>The code in this post is intentionally simple and unoptimized—it&#39;s a playground, not a library. Break it, extend it, and use it to build intuition before diving into production ZK frameworks.</p>
+<div class="page-foot">
+    Contact me by <a href="mailto:skchu@wustl.edu">E-mail</a> | <a href="https://github.com/kchu25">Github</a> | <a href="https://www.linkedin.com/in/kchu1/">Linkedin</a>
+    <br>
+    This work is licensed under <a href="http://creativecommons.org/licenses/by-sa/4.0/">CC BY-SA 4.0</a>.  Last modified: February 21, 2026.
+    <br>
+    Website built with <a href="https://github.com/tlienart/Franklin.jl">Franklin.jl</a> and the <a href="https://julialang.org">Julia language</a>.
+</div>
+</div><!-- CONTENT ENDS HERE -->
+    
+        <script src="/libs/katex/katex.min.js"></script>
+<script src="/libs/katex/contrib/auto-render.min.js"></script>
+<script>renderMathInElement(document.body)</script>
+
+    
+    
+        <script src="/libs/highlight/highlight.min.js"></script>
+<script>
+// Register Solidity language for highlight.js
+hljs.registerLanguage('solidity', function(hljs) {
+  return {
+    keywords: {
+      keyword: 'contract interface library pragma import using struct enum event modifier function returns return require revert assert emit new delete if else for while do break continue try catch throw this super constructor fallback receive ' +
+                'public private internal external pure view payable virtual override constant immutable anonymous indexed storage memory calldata',
+      literal: 'true false wei gwei ether seconds minutes hours days weeks years',
+      built_in: 'msg block tx abi now sender value gas data origin gasprice blockhash gasleft address uint int bytes string bool mapping'
+    },
+    contains: [
+      hljs.C_LINE_COMMENT_MODE,
+      hljs.C_BLOCK_COMMENT_MODE,
+      hljs.QUOTE_STRING_MODE,
+      hljs.APOS_STRING_MODE,
+      {
+        className: 'number',
+        begin: '\\b(0[xX][a-fA-F0-9]+|(\\d+(\\.\\d*)?|\\.\\d+)([eE][-+]?\\d+)?)',
+        relevance: 0
+      },
+      {
+        className: 'type',
+        begin: '\\b(uint|int|bytes|byte|string|address|bool|ufixed|fixed)(\\d+x\\d+|\\d+)?\\b'
+      },
+      {
+        className: 'function',
+        beginKeywords: 'function modifier event constructor fallback receive',
+        end: '[{;]',
+        excludeEnd: true,
+        contains: [
+          {
+            className: 'title',
+            begin: '[A-Za-z$_][0-9A-Za-z$_]*',
+            relevance: 0
+          },
+          {
+            className: 'params',
+            begin: '\\(', end: '\\)',
+            contains: [hljs.C_LINE_COMMENT_MODE, hljs.C_BLOCK_COMMENT_MODE]
+          }
+        ]
+      }
+    ]
+  };
+});
+
+hljs.highlightAll();
+hljs.configure({tabReplace: '    '});
+</script>
+
+
+    
+  </body>
+</html>

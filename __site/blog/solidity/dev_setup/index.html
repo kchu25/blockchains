@@ -1,0 +1,706 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@700;900&display=swap" rel="stylesheet">
+  <style>
+    @font-face {
+      font-family: 'BPdots';
+      src: url('/blockchains/assets/fonts/BPdots/BPdots.otf') format('opentype');
+      font-weight: normal;
+      font-style: normal;
+    }
+    @font-face {
+      font-family: 'BPdots';
+      src: url('/blockchains/assets/fonts/BPdots/BPdotsBold.otf') format('opentype');
+      font-weight: bold;
+      font-style: normal;
+    }
+  </style>
+  
+   <link rel="stylesheet" href="/libs/highlight/styles/atom-one-dark.min.css">
+   
+  <link rel="stylesheet" href="/css/franklin.css">
+<link rel="stylesheet" href="/css/hypertext.css">
+<link rel="icon" href="/assets/favicon.png">
+
+   <title>Solidity Development: Setup, Workflow, and VSCode</title>  
+</head>
+<body>
+<header>
+  <h1 style="color:#283747; font-family:'BPdots', monospace; font-size:2.5em; font-weight:normal; letter-spacing:0.1em">blockchains</h1>
+  <nav>
+    <a href="/" class="current">Tags</a>
+  | <a href="/blog/" >Notes</a>
+  <hr/>
+  </nav>
+</header>
+
+
+<!-- Content appended here -->
+<div class="franklin-content"><h1 id="solidity_development_setup_workflow_and_vscode"><a href="#solidity_development_setup_workflow_and_vscode" class="header-anchor">Solidity Development: Setup, Workflow, and VSCode</a></h1>
+<p><strong>TL;DR:</strong> This post covers the complete development environment for Solidity—from installing Node.js and Hardhat to writing, testing, and deploying contracts in VSCode. You&#39;ll understand the difference between Hardhat and Foundry, how the build pipeline works, and how to iterate fast on contract development.</p>
+<hr />
+<h2 id="part_1_understanding_the_development_stack"><a href="#part_1_understanding_the_development_stack" class="header-anchor">Part 1: Understanding the Development Stack</a></h2>
+<p>Before touching code, let&#39;s understand the layers. When you write Solidity, you&#39;re writing for the <strong>Ethereum Virtual Machine &#40;EVM&#41;</strong>—a stack-based 256-bit computer. The toolchain converts your high-level Solidity code into bytecode that lives on the blockchain.</p>
+<pre><code class="language-julia">You write Solidity code &#40;.sol files&#41;
+    ↓
+Solidity Compiler &#40;solc&#41; parses and type-checks
+    ↓
+Compiles to EVM bytecode &#40;bytes that run on every node&#41;
+    ↓
+You deploy to Ethereum &#40;send bytecode &#43; constructor args&#41;
+    ↓
+Contract lives at an address, state persists forever</code></pre>
+<p><strong>Key insight:</strong> Unlike traditional programming where you run code on your own machine, smart contracts run on <em>everyone&#39;s machine simultaneously</em>. This is powerful &#40;unstoppable&#41; and dangerous &#40;immutable bugs&#41;.</p>
+<h3 id="two_main_frameworks_hardhat_vs_foundry"><a href="#two_main_frameworks_hardhat_vs_foundry" class="header-anchor">Two Main Frameworks: Hardhat vs. Foundry</a></h3>
+<p>There are two dominant Solidity development frameworks. Both work, but they differ in philosophy:</p>
+<table><tr><th align="right">Aspect</th><th align="right">Hardhat</th><th align="right">Foundry</th></tr><tr><td align="right"><strong>Language</strong></td><td align="right">JavaScript/TypeScript &#40;Node.js&#41;</td><td align="right">Rust</td></tr><tr><td align="right"><strong>Testing</strong></td><td align="right">Ethers.js &#40;JavaScript&#41;</td><td align="right">Solidity &#40;write tests in Solidity&#33;&#41;</td></tr><tr><td align="right"><strong>Speed</strong></td><td align="right">Slower &#40;Node.js overhead&#41;</td><td align="right">~100x faster &#40;compiled Rust&#41;</td></tr><tr><td align="right"><strong>Ecosystem</strong></td><td align="right">More plugins, wider adoption</td><td align="right">Simpler, leaner, faster</td></tr><tr><td align="right"><strong>Learning curve</strong></td><td align="right">JS/TS &#43; Solidity</td><td align="right">Just Solidity for tests</td></tr><tr><td align="right"><strong>Best for</strong></td><td align="right">Complex systems &#40;dapps &#43; contracts&#41;, plugin ecosystem</td><td align="right">Pure smart contract development</td></tr></table>
+<p><strong>Recommendation for a CS PhD:</strong> Start with <strong>Hardhat</strong> if you want to build full dapps &#40;frontend &#43; backend&#41;. Use <strong>Foundry</strong> if you&#39;re focused purely on contract development and want speed. We&#39;ll cover Hardhat here since it&#39;s more beginner-friendly.</p>
+<blockquote>
+<p><strong>Why does the framework matter?</strong> Solidity itself is just a language. The framework handles compilation, testing, deployment, and local simulation &#40;a fake Ethereum&#41;. Picking the wrong framework means wrestling with bad ergonomics. Hardhat has better tooling for complex setups; Foundry is pure and fast.</p>
+</blockquote>
+<hr />
+<h2 id="part_2_setting_up_your_development_environment"><a href="#part_2_setting_up_your_development_environment" class="header-anchor">Part 2: Setting Up Your Development Environment</a></h2>
+<h3 id="step_1_install_nodejs"><a href="#step_1_install_nodejs" class="header-anchor">Step 1: Install Node.js</a></h3>
+<p>Hardhat runs on Node.js. Install the LTS version:</p>
+<pre><code class="language-bash"># macOS &#40;using Homebrew&#41;
+brew install node@18
+
+# Linux &#40;using apt&#41;
+sudo apt-get install nodejs npm
+
+# Verify installation
+node --version  # Should be v18.x or higher
+npm --version   # Should be 9.x or higher</code></pre>
+<h3 id="step_2_create_a_new_hardhat_project_in_vscode"><a href="#step_2_create_a_new_hardhat_project_in_vscode" class="header-anchor">Step 2: Create a New Hardhat Project in VSCode</a></h3>
+<p>Open VSCode and create a directory for your project:</p>
+<pre><code class="language-bash">mkdir my_solidity_project &amp;&amp; cd my_solidity_project</code></pre>
+<p>Initialize a new Hardhat project:</p>
+<pre><code class="language-bash">npm init -y
+npm install --save-dev hardhat</code></pre>
+<p>Initialize Hardhat with the init flag:</p>
+<pre><code class="language-bash">npx hardhat --init</code></pre>
+<p>When prompted, choose:</p>
+<ul>
+<li><p><strong>&quot;A TypeScript Hardhat project using Mocha and Ethers.js&quot;</strong> ← Pick this one &#40;industry standard setup&#41;</p>
+</li>
+<li><p><strong>&quot;Do you want to add a .gitignore?&quot;</strong> → Yes</p>
+</li>
+<li><p><strong>&quot;Do you want to install the sample project dependencies?&quot;</strong> → Yes</p>
+</li>
+</ul>
+<p>This gives you TypeScript &#40;better IDE support&#41;, Mocha &#40;test framework&#41;, and Ethers.js &#40;the modern library for contract interaction&#41;.</p>
+<p>This creates:</p>
+<pre><code class="language-julia">my_solidity_project/
+├── contracts/          # Your .sol files live here
+│   └── Lock.sol        # Sample contract &#40;delete this&#41;
+├── ignition/           # Hardhat&#39;s deployment scripts
+├── test/               # Test files
+├── hardhat.config.js   # Configuration
+├── package.json        # Dependencies
+└── .env.example        # Environment variables &#40;copy to .env&#41;</code></pre>
+<h3 id="step_3_vscode_extensions_for_solidity"><a href="#step_3_vscode_extensions_for_solidity" class="header-anchor">Step 3: VSCode Extensions for Solidity</a></h3>
+<p>Install these extensions in VSCode &#40;Ctrl&#43;Shift&#43;X&#41;:</p>
+<ol>
+<li><p><strong>Solidity</strong> &#40;by Juan Blanco&#41; — syntax highlighting &#43; compiler errors</p>
+</li>
+<li><p><strong>Hardhat for Visual Studio Code</strong> &#40;by Nomic Foundation&#41; — integration with Hardhat</p>
+</li>
+<li><p><strong>Prettier</strong> &#40;by Esbenp&#41; — code formatting</p>
+</li>
+</ol>
+<p>After installing Solidity extension, open VSCode settings &#40;Ctrl&#43;,&#41; and add:</p>
+<pre><code class="language-json">&#123;
+  &quot;&#91;solidity&#93;&quot;: &#123;
+    &quot;editor.defaultFormatter&quot;: &quot;JuanBlanco.solidity&quot;,
+    &quot;editor.formatOnSave&quot;: true
+  &#125;,
+  &quot;solidity.compileUsingRemoteVersion&quot;: &quot;0.8.24&quot;
+&#125;</code></pre>
+<p>This tells VSCode to use Solidity 0.8.24 for syntax checking &#40;matches your <code>hardhat.config.js</code>&#41;.</p>
+<h3 id="step_4_configure_hardhat"><a href="#step_4_configure_hardhat" class="header-anchor">Step 4: Configure Hardhat</a></h3>
+<p>Open <code>hardhat.config.js</code> and set the compiler version. It should look like this:</p>
+<pre><code class="language-javascript">require&#40;&quot;@nomicfoundation/hardhat-toolbox&quot;&#41;;
+
+module.exports &#61; &#123;
+  solidity: &quot;0.8.24&quot;,  // Match your Solidity version
+  networks: &#123;
+    hardhat: &#123;
+      // Local test network &#40;free, instant, in-memory&#41;
+      // No config needed — just works
+    &#125;,
+    sepolia: &#123;
+      // Ethereum testnet &#40;real testnet, needs RPC URL&#41;
+      url: process.env.SEPOLIA_RPC_URL || &quot;&quot;,
+      accounts: process.env.PRIVATE_KEY ? &#91;process.env.PRIVATE_KEY&#93; : &#91;&#93;,
+    &#125;,
+  &#125;,
+&#125;;</code></pre>
+<p>Create a <code>.env</code> file in your project root &#40;copy from <code>.env.example</code>&#41;:</p>
+<pre><code class="language-julia">SEPOLIA_RPC_URL&#61;https://sepolia.infura.io/v3/YOUR_INFURA_KEY
+PRIVATE_KEY&#61;your_private_key_here</code></pre>
+<blockquote>
+<p><strong>Never commit <code>.env</code> to git&#33;</strong> It contains private keys. Use <code>.gitignore</code> to exclude it.</p>
+</blockquote>
+<hr />
+<h2 id="part_3_the_development_workflow"><a href="#part_3_the_development_workflow" class="header-anchor">Part 3: The Development Workflow</a></h2>
+<p>This is the typical flow when writing contracts:</p>
+<pre><code class="language-julia">1. Write contract code &#40;.sol file&#41;
+   ↓
+2. Compile &#40;solc checks syntax, produces bytecode&#41;
+   ↓
+3. Write tests &#40;.test.js or .test.sol file&#41;
+   ↓
+4. Run tests &#40;against local fake Ethereum&#41;
+   ↓
+5. Deploy to local testnet &#40;hardhat network&#41;
+   ↓
+6. Interact with contract &#40;call functions, check state&#41;
+   ↓
+7. Deploy to real testnet &#40;Sepolia&#41; or mainnet</code></pre>
+<h3 id="step_1_write_a_simple_contract"><a href="#step_1_write_a_simple_contract" class="header-anchor">Step 1: Write a Simple Contract</a></h3>
+<p>Delete the sample contract and create <code>contracts/Counter.sol</code>:</p>
+<pre><code class="language-solidity">// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.24;
+
+contract Counter &#123;
+    uint256 public count &#61; 0;
+    
+    // Event: emitted when count changes &#40;indexed for filtering&#41;
+    event CountIncremented&#40;address indexed who, uint256 newCount&#41;;
+    
+    // Increment the counter
+    function increment&#40;&#41; public &#123;
+        count &#43;&#61; 1;
+        emit CountIncremented&#40;msg.sender, count&#41;;
+    &#125;
+    
+    // Decrement the counter &#40;only if count &gt; 0&#41;
+    function decrement&#40;&#41; public &#123;
+        require&#40;count &gt; 0, &quot;Count cannot be negative&quot;&#41;;
+        count -&#61; 1;
+    &#125;
+    
+    // Get the current count &#40;view &#61; read-only, free to call&#41;
+    function getCount&#40;&#41; public view returns &#40;uint256&#41; &#123;
+        return count;
+    &#125;
+&#125;</code></pre>
+<p><strong>Key Solidity concepts here:</strong></p>
+<ul>
+<li><p><code>public</code> &#61; anyone can call &#40;contract or external&#41;</p>
+</li>
+<li><p><code>view</code> &#61; read-only function, doesn&#39;t modify state, free to call</p>
+</li>
+<li><p><code>require&#40;condition, &quot;error message&quot;&#41;</code> &#61; assert, revert if false</p>
+</li>
+<li><p><code>event</code> &#61; log data to blockchain &#40;used for client notifications&#41;</p>
+</li>
+<li><p><code>msg.sender</code> &#61; address of the caller</p>
+</li>
+</ul>
+<h3 id="step_2_compile_the_contract"><a href="#step_2_compile_the_contract" class="header-anchor">Step 2: Compile the Contract</a></h3>
+<p>In VSCode terminal &#40;Ctrl&#43;&lt;code&gt;&#96;&lt;/code&gt;&#41;:</p>
+<pre><code class="language-bash">npx hardhat compile</code></pre>
+<p>This outputs:</p>
+<pre><code class="language-bash">Compiling 1 file with 0.8.24
+Compilation successful&#33;</code></pre>
+<p>Compiled artifacts go to <code>artifacts/contracts/</code> &#40;don&#39;t edit manually&#41;.</p>
+<h3 id="step_3_write_tests"><a href="#step_3_write_tests" class="header-anchor">Step 3: Write Tests</a></h3>
+<p>Create <code>test/Counter.test.ts</code>:</p>
+<pre><code class="language-typescript">import &#123; expect &#125; from &quot;chai&quot;;
+import &#123; ethers &#125; from &quot;hardhat&quot;;
+
+describe&#40;&quot;Counter Contract&quot;, function &#40;&#41; &#123;
+  let counter: any;
+  let owner: any;
+
+  // Setup: deploy contract before each test
+  beforeEach&#40;async function &#40;&#41; &#123;
+    // Get the contract factory &#40;like a class&#41;
+    const Counter &#61; await ethers.getContractFactory&#40;&quot;Counter&quot;&#41;;
+    
+    // Deploy instance
+    counter &#61; await Counter.deploy&#40;&#41;;
+    
+    // Get the deployer&#39;s address &#40;accounts&#91;0&#93; on local network&#41;
+    &#91;owner&#93; &#61; await ethers.getSigners&#40;&#41;;
+  &#125;&#41;;
+
+  it&#40;&quot;Should initialize with count &#61; 0&quot;, async function &#40;&#41; &#123;
+    expect&#40;await counter.getCount&#40;&#41;&#41;.to.equal&#40;0&#41;;
+  &#125;&#41;;
+
+  it&#40;&quot;Should increment count&quot;, async function &#40;&#41; &#123;
+    // Call the function
+    await counter.increment&#40;&#41;;
+    
+    // Check the result
+    expect&#40;await counter.getCount&#40;&#41;&#41;.to.equal&#40;1&#41;;
+  &#125;&#41;;
+
+  it&#40;&quot;Should emit event on increment&quot;, async function &#40;&#41; &#123;
+    // expect&#40;&#41; the transaction to emit an event
+    await expect&#40;counter.increment&#40;&#41;&#41;
+      .to.emit&#40;counter, &quot;CountIncremented&quot;&#41;
+      .withArgs&#40;owner.address, 1&#41;;
+  &#125;&#41;;
+
+  it&#40;&quot;Should decrement count&quot;, async function &#40;&#41; &#123;
+    await counter.increment&#40;&#41;;
+    await counter.increment&#40;&#41;;
+    await counter.decrement&#40;&#41;;
+    expect&#40;await counter.getCount&#40;&#41;&#41;.to.equal&#40;1&#41;;
+  &#125;&#41;;
+
+  it&#40;&quot;Should revert decrement if count is 0&quot;, async function &#40;&#41; &#123;
+    // expect&#40;&#41; the call to revert with this message
+    await expect&#40;counter.decrement&#40;&#41;&#41;.to.be.revertedWith&#40;
+      &quot;Count cannot be negative&quot;
+    &#41;;
+  &#125;&#41;;
+
+  it&#40;&quot;Should work with multiple callers&quot;, async function &#40;&#41; &#123;
+    const &#91;addr1, addr2&#93; &#61; await ethers.getSigners&#40;&#41;;
+
+    // addr1 increments twice
+    await counter.connect&#40;addr1&#41;.increment&#40;&#41;;
+    await counter.connect&#40;addr1&#41;.increment&#40;&#41;;
+
+    // addr2 increments once
+    await counter.connect&#40;addr2&#41;.increment&#40;&#41;;
+
+    // Counter is global, incremented by both
+    expect&#40;await counter.getCount&#40;&#41;&#41;.to.equal&#40;3&#41;;
+  &#125;&#41;;
+&#125;&#41;;</code></pre>
+<p><strong>Key testing concepts:</strong></p>
+<ul>
+<li><p><code>beforeEach&#40;&#41;</code> — setup before each test &#40;deploy contract fresh&#41;</p>
+</li>
+<li><p><code>await ethers.getContractFactory&#40;&quot;ContractName&quot;&#41;</code> — get the contract class</p>
+</li>
+<li><p><code>await contract.deploy&#40;&#41;</code> — deploy to local fake Ethereum</p>
+</li>
+<li><p><code>.connect&#40;signer&#41;</code> — call function as a different address</p>
+</li>
+<li><p><code>expect&#40;...&#41;.to.emit&#40;...&#41;</code> — check for events</p>
+</li>
+<li><p><code>expect&#40;...&#41;.to.be.revertedWith&#40;&quot;message&quot;&#41;</code> — check for reverts</p>
+</li>
+</ul>
+<h3 id="step_4_run_tests"><a href="#step_4_run_tests" class="header-anchor">Step 4: Run Tests</a></h3>
+<pre><code class="language-bash">npx hardhat test</code></pre>
+<p>Output:</p>
+<pre><code class="language-julia">Counter Contract
+    ✓ Should initialize with count &#61; 0 &#40;456ms&#41;
+    ✓ Should increment count &#40;342ms&#41;
+    ✓ Should emit event on increment &#40;389ms&#41;
+    ✓ Should decrement count &#40;378ms&#41;
+    ✓ Should revert decrement if count is 0 &#40;287ms&#41;
+    ✓ Should work with multiple callers &#40;503ms&#41;
+
+  6 passing &#40;2.7s&#41;</code></pre>
+<p><strong>Pro tip:</strong> Run tests on save with:</p>
+<pre><code class="language-bash">npx hardhat test --watch</code></pre>
+<p>This reruns tests every time you save a <code>.sol</code> or <code>.test.ts</code> file—perfect for TDD.</p>
+<h3 id="step_5_deploy_locally"><a href="#step_5_deploy_locally" class="header-anchor">Step 5: Deploy Locally</a></h3>
+<p>Create a simple deployment script in <code>ignition/modules/Counter.js</code>:</p>
+<pre><code class="language-javascript">const &#123; buildModule &#125; &#61; require&#40;&quot;@nomicfoundation/hardhat-ignition/modules&quot;&#41;;
+
+module.exports &#61; buildModule&#40;&quot;CounterModule&quot;, &#40;m&#41; &#61;&gt; &#123;
+  const counter &#61; m.contract&#40;&quot;Counter&quot;&#41;;
+  return &#123; counter &#125;;
+&#125;&#41;;</code></pre>
+<p>Deploy to the local Hardhat network:</p>
+<pre><code class="language-bash">npx hardhat ignition deploy ignition/modules/Counter.js</code></pre>
+<p>This starts a temporary local Ethereum, deploys your contract, and exits. Output shows the deployed address.</p>
+<h3 id="step_6_interact_with_the_contract_advanced"><a href="#step_6_interact_with_the_contract_advanced" class="header-anchor">Step 6: Interact with the Contract &#40;Advanced&#41;</a></h3>
+<p>For more complex interaction, write a script in <code>scripts/interact.ts</code>:</p>
+<pre><code class="language-typescript">async function main&#40;&#41; &#123;
+  // Get the contract at a deployed address
+  const counterAddress &#61; &quot;0x5FbDB2315678afccb333f8a9c45b65d30061dde7&quot;;
+  const Counter &#61; await ethers.getContractFactory&#40;&quot;Counter&quot;&#41;;
+  const counter &#61; Counter.attach&#40;counterAddress&#41;;
+
+  // Call view function &#40;free, doesn&#39;t require transaction&#41;
+  console.log&#40;&quot;Current count:&quot;, await counter.getCount&#40;&#41;&#41;;
+
+  // Send transaction
+  let tx &#61; await counter.increment&#40;&#41;;
+  console.log&#40;&quot;Transaction hash:&quot;, tx.hash&#41;;
+  
+  // Wait for 1 confirmation
+  let receipt &#61; await tx.wait&#40;1&#41;;
+  console.log&#40;&quot;Mined in block:&quot;, receipt.blockNumber&#41;;
+
+  console.log&#40;&quot;New count:&quot;, await counter.getCount&#40;&#41;&#41;;
+&#125;
+
+main&#40;&#41;.catch&#40;&#40;error&#41; &#61;&gt; &#123;
+  console.error&#40;error&#41;;
+  process.exitCode &#61; 1;
+&#125;&#41;;</code></pre>
+<p>Run it:</p>
+<pre><code class="language-bash">npx hardhat run scripts/interact.ts --network hardhat</code></pre>
+<hr />
+<h2 id="part_4_gas_state_and_key_concepts"><a href="#part_4_gas_state_and_key_concepts" class="header-anchor">Part 4: Gas, State, and Key Concepts</a></h2>
+<h3 id="gas_the_cost_of_computation"><a href="#gas_the_cost_of_computation" class="header-anchor">Gas: The Cost of Computation</a></h3>
+<p>Every operation on the EVM costs <strong>gas</strong>. Gas is priced in <strong>gwei</strong> &#40;1 ETH &#61; 10^9 gwei&#41;. Users pay gas fees to miners/validators.</p>
+<pre><code class="language-solidity">function store&#40;uint256 value&#41; public &#123;
+    data &#61; value;  // ~20,000 gas &#40;writing to storage is expensive&#33;&#41;
+&#125;
+
+function read&#40;&#41; public view returns &#40;uint256&#41; &#123;
+    return data;   // ~2,100 gas &#40;reading from storage&#41;
+&#125;</code></pre>
+<p><strong>Gas costs for common operations:</strong></p>
+<ul>
+<li><p>Adding two numbers: 3 gas</p>
+</li>
+<li><p>Multiplying: 5 gas</p>
+</li>
+<li><p>Reading storage: 2,100 gas</p>
+</li>
+<li><p>Writing storage: 20,000 gas</p>
+</li>
+<li><p>Calling another contract: 700 gas</p>
+</li>
+</ul>
+<p><strong>Pro tip:</strong> Always optimize for gas when deploying to mainnet. Unused code is dead weight.</p>
+<h3 id="state_persistence"><a href="#state_persistence" class="header-anchor">State Persistence</a></h3>
+<p>State variables live on the blockchain permanently. Every time you modify them, it costs gas and requires a new block.</p>
+<pre><code class="language-solidity">contract Storage &#123;
+    uint256 public myNumber;  // Stored on blockchain
+    
+    function setNumber&#40;uint256 _n&#41; public &#123;
+        myNumber &#61; _n;  // Modifies blockchain state, costs gas
+    &#125;
+    
+    function getNumber&#40;&#41; public view returns &#40;uint256&#41; &#123;
+        return myNumber;  // Reads blockchain, free &#40;just queries&#41;
+    &#125;
+&#125;</code></pre>
+<p><strong>View vs. Pure:</strong></p>
+<ul>
+<li><p><code>view</code> — can read state, cannot modify</p>
+</li>
+<li><p><code>pure</code> — cannot read or modify state &#40;used for calculations&#41;</p>
+</li>
+<li><p><code>payable</code> — can receive ether &#40;ETH&#41;</p>
+</li>
+</ul>
+<h3 id="visibility_modifiers"><a href="#visibility_modifiers" class="header-anchor">Visibility Modifiers</a></h3>
+<ul>
+<li><p><code>public</code> — anyone can call, state is readable by all</p>
+</li>
+<li><p><code>internal</code> — only this contract &#43; subcontracts can call</p>
+</li>
+<li><p><code>private</code> — only this contract &#40;most restrictive&#41;</p>
+</li>
+<li><p><code>external</code> — can&#39;t be called from within contract, only from outside</p>
+</li>
+</ul>
+<pre><code class="language-solidity">contract Visibility &#123;
+    uint256 public publicNum &#61; 1;      // Anyone can read/modify via function
+    uint256 internal internalNum &#61; 2;  // Only inside this contract
+    uint256 private privateNum &#61; 3;    // Only inside this contract &#40;same as internal usually&#41;
+    
+    function externalOnly&#40;&#41; external &#123;
+        // Can only be called from outside
+    &#125;
+    
+    function internalUse&#40;&#41; internal &#123;
+        // Called only from within this contract
+    &#125;
+&#125;</code></pre>
+<hr />
+<h2 id="part_5_deploying_to_testnet_sepolia"><a href="#part_5_deploying_to_testnet_sepolia" class="header-anchor">Part 5: Deploying to Testnet &#40;Sepolia&#41;</a></h2>
+<p>Once your contract passes tests, deploy to a real &#40;but free&#41; testnet:</p>
+<h3 id="step_1_get_testnet_eth"><a href="#step_1_get_testnet_eth" class="header-anchor">Step 1: Get Testnet ETH</a></h3>
+<p>Visit <a href="https://sepoliafaucet.com/">Sepolia Faucet</a> and get test ETH &#40;free&#41;.</p>
+<h3 id="step_2_get_an_rpc_endpoint"><a href="#step_2_get_an_rpc_endpoint" class="header-anchor">Step 2: Get an RPC Endpoint</a></h3>
+<p>Sign up for <a href="https://infura.io/">Infura</a> &#40;free tier is fine&#41; and get a Sepolia RPC URL.</p>
+<h3 id="step_3_update_env"><a href="#step_3_update_env" class="header-anchor">Step 3: Update <code>.env</code></a></h3>
+<pre><code class="language-julia">SEPOLIA_RPC_URL&#61;https://sepolia.infura.io/v3/YOUR_PROJECT_ID
+PRIVATE_KEY&#61;your_wallet_private_key  # Export from MetaMask</code></pre>
+<h3 id="step_4_deploy"><a href="#step_4_deploy" class="header-anchor">Step 4: Deploy</a></h3>
+<pre><code class="language-bash">npx hardhat ignition deploy ignition/modules/Counter.js --network sepolia</code></pre>
+<p><strong>Output:</strong></p>
+<pre><code class="language-julia">✔ Confirm deploy to network sepolia &#40;chain id: 11155111&#41;? &#40;y/N&#41; y
+
+Deploying &#91; CounterModule &#93;
+
+✔ Sent deployment transaction with hash 0x123abc...
+✔ Waiting for confirmations... &#40;block: 5&#41;
+✔ Deployment complete&#33; Deployment ID: 0x...
+
+CounterModule#Counter - 0x5FbDB2315678afccb333f8a9c45b65d30061dde7</code></pre>
+<p>Now your contract is <strong>live on Sepolia</strong>&#33; Visit <a href="https://sepolia.etherscan.io/">Sepolia Etherscan</a> and paste the address to see transactions.</p>
+<h3 id="step_5_interact_with_deployed_contract"><a href="#step_5_interact_with_deployed_contract" class="header-anchor">Step 5: Interact with Deployed Contract</a></h3>
+<pre><code class="language-bash">npx hardhat run scripts/interact.js --network sepolia</code></pre>
+<p>This now runs against the real testnet &#40;slower, takes ~12 seconds per block&#41;.</p>
+<hr />
+<h2 id="part_6_vscode_productivity_tips"><a href="#part_6_vscode_productivity_tips" class="header-anchor">Part 6: VSCode Productivity Tips</a></h2>
+<h3 id="snippet_for_new_contract"><a href="#snippet_for_new_contract" class="header-anchor">Snippet for New Contract</a></h3>
+<p>Create <code>.vscode/solidity.code-snippets</code>:</p>
+<pre><code class="language-json">&#123;
+  &quot;New Solidity Contract&quot;: &#123;
+    &quot;prefix&quot;: &quot;solcontract&quot;,
+    &quot;body&quot;: &#91;
+      &quot;// SPDX-License-Identifier: MIT&quot;,
+      &quot;pragma solidity ^0.8.24;&quot;,
+      &quot;&quot;,
+      &quot;contract &#36;&#123;1:MyContract&#125; &#123;&quot;,
+      &quot;    // State variables&quot;,
+      &quot;    &quot;,
+      &quot;    // Events&quot;,
+      &quot;    &quot;,
+      &quot;    // Constructor&quot;,
+      &quot;    constructor&#40;&#41; &#123;&#125;&quot;,
+      &quot;    &quot;,
+      &quot;    // Functions&quot;,
+      &quot;    function &#36;&#123;2:myFunction&#125;&#40;&#41; public &#123;&#125;&quot;,
+      &quot;&#125;&quot;,
+      &quot;&quot;
+    &#93;,
+    &quot;description&quot;: &quot;Create a new Solidity contract&quot;
+  &#125;
+&#125;</code></pre>
+<p>Now type <code>solcontract</code> &#43; Tab to scaffold a new contract.</p>
+<h3 id="integrated_terminal"><a href="#integrated_terminal" class="header-anchor">Integrated Terminal</a></h3>
+<p>Use VSCode&#39;s integrated terminal &#40;Ctrl&#43;&lt;code&gt;&#96;&lt;/code&gt;&#41;. Run:</p>
+<ul>
+<li><p><code>npm test</code> &#40;run tests continuously&#41;</p>
+</li>
+<li><p><code>npm run hardhat compile</code> &#40;compile on save&#41;</p>
+</li>
+<li><p><code>npm run hardhat run scripts/interact.js</code> &#40;deploy script&#41;</p>
+</li>
+</ul>
+<h3 id="debugging"><a href="#debugging" class="header-anchor">Debugging</a></h3>
+<p>Add breakpoints in test files and run:</p>
+<pre><code class="language-bash">node --inspect-brk node_modules/.bin/hardhat test</code></pre>
+<p>Then open <code>chrome://inspect</code> in Chrome for a debugger.</p>
+<h3 id="git_integration"><a href="#git_integration" class="header-anchor">Git Integration</a></h3>
+<p>Always commit to git:</p>
+<pre><code class="language-bash">git add .
+git commit -m &quot;Add Counter contract with tests&quot;</code></pre>
+<p>But <strong>never commit <code>.env</code></strong> — it contains private keys&#33;</p>
+<hr />
+<h2 id="part_7_common_patterns_gotchas"><a href="#part_7_common_patterns_gotchas" class="header-anchor">Part 7: Common Patterns &amp; Gotchas</a></h2>
+<h3 id="pattern_1_owneradmin_contracts"><a href="#pattern_1_owneradmin_contracts" class="header-anchor">Pattern 1: Owner/Admin Contracts</a></h3>
+<pre><code class="language-solidity">contract Owned &#123;
+    address public owner;
+    
+    constructor&#40;&#41; &#123;
+        owner &#61; msg.sender;
+    &#125;
+    
+    modifier onlyOwner&#40;&#41; &#123;
+        require&#40;msg.sender &#61;&#61; owner, &quot;Only owner can call&quot;&#41;;
+        _;  // This underscore means &quot;run the function body here&quot;
+    &#125;
+    
+    function doAdminThing&#40;&#41; public onlyOwner &#123;
+        // Only owner can call
+    &#125;
+&#125;</code></pre>
+<h3 id="pattern_2_receiving_ether"><a href="#pattern_2_receiving_ether" class="header-anchor">Pattern 2: Receiving Ether</a></h3>
+<pre><code class="language-solidity">contract EtherReceiver &#123;
+    receive&#40;&#41; external payable &#123;
+        // Called when someone sends ether with no data
+    &#125;
+    
+    fallback&#40;&#41; external payable &#123;
+        // Called if no function matches
+    &#125;
+    
+    function withdraw&#40;&#41; public &#123;
+        &#40;bool success, &#41; &#61; msg.sender.call&#123;value: address&#40;this&#41;.balance&#125;&#40;&quot;&quot;&#41;;
+        require&#40;success, &quot;Withdrawal failed&quot;&#41;;
+    &#125;
+&#125;</code></pre>
+<h3 id="gotcha_1_integer_overflow"><a href="#gotcha_1_integer_overflow" class="header-anchor">Gotcha 1: Integer Overflow</a></h3>
+<p>Before Solidity 0.8.0, integers silently overflowed. Now &#40;0.8&#43;&#41;, it reverts:</p>
+<pre><code class="language-solidity">// In Solidity 0.8.24
+uint8 x &#61; 255;
+x &#43;&#61; 1;  // Reverts&#33; &#40;overflow protection&#41;</code></pre>
+<h3 id="gotcha_2_reentrancy"><a href="#gotcha_2_reentrancy" class="header-anchor">Gotcha 2: Reentrancy</a></h3>
+<p>A called contract can call back into you. Always follow &quot;checks-effects-interactions&quot;:</p>
+<pre><code class="language-solidity">// ❌ BAD: vulnerable to reentrancy
+function withdraw&#40;uint256 amount&#41; public &#123;
+    uint256 balance &#61; balances&#91;msg.sender&#93;;
+    require&#40;balance &gt;&#61; amount&#41;;
+    &#40;bool success, &#41; &#61; msg.sender.call&#123;value: amount&#125;&#40;&quot;&quot;&#41;;
+    require&#40;success&#41;;
+    balances&#91;msg.sender&#93; &#61; 0;  // Attacker can call back before this line&#33;
+&#125;
+
+// ✅ GOOD: Checks-Effects-Interactions
+function withdraw&#40;uint256 amount&#41; public &#123;
+    uint256 balance &#61; balances&#91;msg.sender&#93;;
+    require&#40;balance &gt;&#61; amount&#41;;                    // Checks
+    balances&#91;msg.sender&#93; &#61; 0;                     // Effects
+    &#40;bool success, &#41; &#61; msg.sender.call&#123;value: amount&#125;&#40;&quot;&quot;&#41;;  // Interactions
+    require&#40;success&#41;;
+&#125;</code></pre>
+<h3 id="gotcha_3_private_secret"><a href="#gotcha_3_private_secret" class="header-anchor">Gotcha 3: Private ≠ Secret</a></h3>
+<p><code>private</code> variables are hidden from other contracts, but <em>not</em> from users. Everyone can read blockchain data:</p>
+<pre><code class="language-solidity">uint256 private secret;  // NOT actually secret&#33; Visible to everyone on chain</code></pre>
+<hr />
+<h2 id="part_8_next_steps"><a href="#part_8_next_steps" class="header-anchor">Part 8: Next Steps</a></h2>
+<p>You now have a complete development environment. Here&#39;s what to build next:</p>
+<ol>
+<li><p><strong>Modify Counter to be pausable</strong> — add a <code>pause&#40;&#41;</code> function that stops incrementing</p>
+</li>
+<li><p><strong>Add a permission system</strong> — only certain addresses can increment</p>
+</li>
+<li><p><strong>Write a simple token</strong> — implement ERC20 &#40;the standard for tokens&#41;</p>
+</li>
+<li><p><strong>Test edge cases</strong> — overflow, underflow, invalid inputs</p>
+</li>
+<li><p><strong>Deploy to mainnet</strong> &#40;with real stakes&#41; — after extensive testing</p>
+</li>
+</ol>
+<p>Once you&#39;re comfortable with the basics, check out:</p>
+<ul>
+<li><p><strong>Foundry</strong> &#40;<code>forge</code>&#41; if you want blazing speed and pure-Solidity testing</p>
+</li>
+<li><p><strong>Upgradeable Contracts</strong> — how to fix bugs after deployment</p>
+</li>
+<li><p><strong>OpenZeppelin</strong> — battle-tested contract library</p>
+</li>
+<li><p><strong>Real projects</strong> — study the code of Uniswap, Aave, MakerDAO</p>
+</li>
+</ul>
+<hr />
+<h2 id="quick_reference_hardhat_commands"><a href="#quick_reference_hardhat_commands" class="header-anchor">Quick Reference: Hardhat Commands</a></h2>
+<pre><code class="language-bash"># Compile contracts
+npx hardhat compile
+
+# Run all tests
+npx hardhat test
+
+# Run tests in watch mode
+npx hardhat test --watch
+
+# Deploy with Hardhat Ignition
+npx hardhat ignition deploy ignition/modules/MyModule.js
+
+# Deploy to testnet
+npx hardhat ignition deploy ignition/modules/MyModule.js --network sepolia
+
+# Run a script
+npx hardhat run scripts/myScript.js
+
+# Start a standalone local node &#40;doesn&#39;t exit&#41;
+npx hardhat node
+
+# Check gas usage per function
+npx hardhat test --gas-report</code></pre>
+<hr />
+<h2 id="quick_reference_solidity_syntax_cheat_sheet"><a href="#quick_reference_solidity_syntax_cheat_sheet" class="header-anchor">Quick Reference: Solidity Syntax Cheat Sheet</a></h2>
+<pre><code class="language-solidity">// Types
+uint256 number;         // Unsigned integer &#40;256 bits&#41;
+int256 negative;        // Signed integer
+bool flag &#61; true;       // Boolean
+address user;           // 20-byte Ethereum address
+string text &#61; &quot;hello&quot;;  // String &#40;dynamic array of bytes&#41;
+bytes32 hash;           // Fixed-size byte array
+
+// Arrays
+uint256&#91;&#93; dynamic;      // Dynamic array
+uint256&#91;10&#93; fixed;      // Fixed-size array
+
+// Mapping &#40;like a hash map&#41;
+mapping&#40;address &#61;&gt; uint256&#41; balances;  // Address → balance
+
+// Modifiers &#40;reusable conditions&#41;
+modifier onlyOwner&#40;&#41; &#123;
+    require&#40;msg.sender &#61;&#61; owner&#41;;
+    _;
+&#125;
+
+// Functions
+function name&#40;uint256 x&#41; public view returns &#40;uint256&#41; &#123;
+    return x * 2;
+&#125;
+
+// Events
+event Transfer&#40;address indexed from, address indexed to, uint256 amount&#41;;
+emit Transfer&#40;msg.sender, recipient, 100&#41;;
+
+// Errors &#40;new in 0.8.4, cheaper than require&#41;
+error InsufficientBalance&#40;uint256 available, uint256 required&#41;;
+if &#40;balance &lt; amount&#41; revert InsufficientBalance&#40;balance, amount&#41;;</code></pre>
+<p>That&#39;s it&#33; You now have a complete, CS-PhD-level understanding of Solidity development. The key is <strong>iteration</strong>—write, test, break, fix, repeat.</p>
+<div class="page-foot">
+    Contact me by <a href="mailto:skchu@wustl.edu">E-mail</a> | <a href="https://github.com/kchu25">Github</a> | <a href="https://www.linkedin.com/in/kchu1/">Linkedin</a>
+    <br>
+    This work is licensed under <a href="http://creativecommons.org/licenses/by-sa/4.0/">CC BY-SA 4.0</a>.  Last modified: March 01, 2026.
+    <br>
+    Website built with <a href="https://github.com/tlienart/Franklin.jl">Franklin.jl</a> and the <a href="https://julialang.org">Julia language</a>.
+</div>
+</div><!-- CONTENT ENDS HERE -->
+    
+    
+        <script src="/libs/highlight/highlight.min.js"></script>
+<script>
+// Register Solidity language for highlight.js
+hljs.registerLanguage('solidity', function(hljs) {
+  return {
+    keywords: {
+      keyword: 'contract interface library pragma import using struct enum event modifier function returns return require revert assert emit new delete if else for while do break continue try catch throw this super constructor fallback receive ' +
+                'public private internal external pure view payable virtual override constant immutable anonymous indexed storage memory calldata',
+      literal: 'true false wei gwei ether seconds minutes hours days weeks years',
+      built_in: 'msg block tx abi now sender value gas data origin gasprice blockhash gasleft address uint int bytes string bool mapping'
+    },
+    contains: [
+      hljs.C_LINE_COMMENT_MODE,
+      hljs.C_BLOCK_COMMENT_MODE,
+      hljs.QUOTE_STRING_MODE,
+      hljs.APOS_STRING_MODE,
+      {
+        className: 'number',
+        begin: '\\b(0[xX][a-fA-F0-9]+|(\\d+(\\.\\d*)?|\\.\\d+)([eE][-+]?\\d+)?)',
+        relevance: 0
+      },
+      {
+        className: 'type',
+        begin: '\\b(uint|int|bytes|byte|string|address|bool|ufixed|fixed)(\\d+x\\d+|\\d+)?\\b'
+      },
+      {
+        className: 'function',
+        beginKeywords: 'function modifier event constructor fallback receive',
+        end: '[{;]',
+        excludeEnd: true,
+        contains: [
+          {
+            className: 'title',
+            begin: '[A-Za-z$_][0-9A-Za-z$_]*',
+            relevance: 0
+          },
+          {
+            className: 'params',
+            begin: '\\(', end: '\\)',
+            contains: [hljs.C_LINE_COMMENT_MODE, hljs.C_BLOCK_COMMENT_MODE]
+          }
+        ]
+      }
+    ]
+  };
+});
+
+hljs.highlightAll();
+hljs.configure({tabReplace: '    '});
+</script>
+
+
+    
+  </body>
+</html>

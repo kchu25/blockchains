@@ -1,0 +1,400 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@700;900&display=swap" rel="stylesheet">
+  <style>
+    @font-face {
+      font-family: 'BPdots';
+      src: url('/blockchains/assets/fonts/BPdots/BPdots.otf') format('opentype');
+      font-weight: normal;
+      font-style: normal;
+    }
+    @font-face {
+      font-family: 'BPdots';
+      src: url('/blockchains/assets/fonts/BPdots/BPdotsBold.otf') format('opentype');
+      font-weight: bold;
+      font-style: normal;
+    }
+  </style>
+  
+   <link rel="stylesheet" href="/libs/highlight/styles/atom-one-dark.min.css">
+   
+  <link rel="stylesheet" href="/css/franklin.css">
+<link rel="stylesheet" href="/css/hypertext.css">
+<link rel="icon" href="/assets/favicon.png">
+
+   <title>The Solidity App Roadmap: From Idea to Deployed dApp</title>  
+</head>
+<body>
+<header>
+  <h1 style="color:#283747; font-family:'BPdots', monospace; font-size:2.5em; font-weight:normal; letter-spacing:0.1em">blockchains</h1>
+  <nav>
+    <a href="/" class="current">Tags</a>
+  | <a href="/blog/" >Notes</a>
+  <hr/>
+  </nav>
+</header>
+
+
+<!-- Content appended here -->
+<div class="franklin-content"><h1 id="the_solidity_app_roadmap_from_idea_to_deployed_dapp"><a href="#the_solidity_app_roadmap_from_idea_to_deployed_dapp" class="header-anchor">The Solidity App Roadmap: From Idea to Deployed dApp</a></h1>
+<h2 id="the_big_picture_its_simpler_than_you_think"><a href="#the_big_picture_its_simpler_than_you_think" class="header-anchor">The Big Picture &#40;It&#39;s Simpler Than You Think&#41;</a></h2>
+<p>Here&#39;s the thing most guides won&#39;t tell you upfront: <strong>a Solidity app is conceptually not that complicated.</strong> At its core, you&#39;re writing rules for how money &#40;or tokens, or data&#41; moves between people—and those rules live on the blockchain so nobody can cheat. That&#39;s it.</p>
+<p>The complexity isn&#39;t in the <em>what</em>, it&#39;s in the <em>how</em>. There are missing pieces in tooling, gaps in documentation, and a workflow that nobody explains end-to-end. This post is that end-to-end explanation.</p>
+<h2 id="what_can_a_solidity_app_actually_do"><a href="#what_can_a_solidity_app_actually_do" class="header-anchor">What Can a Solidity App Actually Do?</a></h2>
+<p>Let&#39;s strip away the hype. A smart contract is a <strong>state machine with money</strong>. It can:</p>
+<h3 id="hold_and_move_value"><a href="#hold_and_move_value" class="header-anchor"><ol>
+<li><p>Hold and Move Value</p>
+</li>
+</ol>
+</a></h3>
+<ul>
+<li><p>Accept ETH or tokens from users</p>
+</li>
+<li><p>Send ETH or tokens to users based on conditions</p>
+</li>
+<li><p>Lock funds until certain criteria are met</p>
+</li>
+</ul>
+<h3 id="ol_start2_enforce_rules_without_middlemen"><a href="#ol_start2_enforce_rules_without_middlemen" class="header-anchor"><ol start="2">
+<li><p>Enforce Rules Without Middlemen</p>
+</li>
+</ol>
+</a></h3>
+<ul>
+<li><p>&quot;You can only withdraw if you deposited first&quot;</p>
+</li>
+<li><p>&quot;The vote passes only if &gt;50&#37; agree&quot;  </p>
+</li>
+<li><p>&quot;Funds release only after both parties confirm delivery&quot;</p>
+</li>
+</ul>
+<h3 id="ol_start3_create_new_digital_assets"><a href="#ol_start3_create_new_digital_assets" class="header-anchor"><ol start="3">
+<li><p>Create New Digital Assets</p>
+</li>
+</ol>
+</a></h3>
+<ul>
+<li><p>ERC-20 tokens &#40;fungible—like creating your own currency&#41;</p>
+</li>
+<li><p>ERC-721 NFTs &#40;unique items—like digital deeds&#41;</p>
+</li>
+<li><p>ERC-1155 &#40;mix of both&#41;</p>
+</li>
+</ul>
+<h3 id="ol_start4_compose_with_other_contracts"><a href="#ol_start4_compose_with_other_contracts" class="header-anchor"><ol start="4">
+<li><p>Compose With Other Contracts</p>
+</li>
+</ol>
+</a></h3>
+<p>This is the real superpower. Your contract can call other contracts. A lending protocol can use a price oracle, which feeds data from a DEX, which uses a liquidity pool. It&#39;s like LEGO blocks, but for financial infrastructure.</p>
+<h2 id="what_problems_can_it_solve"><a href="#what_problems_can_it_solve" class="header-anchor">What Problems Can It Solve?</a></h2>
+<p>Think about any situation where:</p>
+<ul>
+<li><p><strong>Trust is expensive</strong> — Escrow services, notaries, intermediaries all take a cut. A smart contract does it for gas fees.</p>
+</li>
+<li><p><strong>Rules need to be transparent</strong> — Everyone can read the contract code. No hidden terms.</p>
+</li>
+<li><p><strong>Coordination is hard</strong> — DAOs let strangers pool money and vote on how to spend it, without trusting a treasurer.</p>
+</li>
+<li><p><strong>Access is restricted</strong> — DeFi lending doesn&#39;t care about your credit score or country. Got collateral? You can borrow.</p>
+</li>
+</ul>
+<h3 id="concrete_examples"><a href="#concrete_examples" class="header-anchor">Concrete Examples</a></h3>
+<table><tr><th align="right">Problem</th><th align="right">Traditional Solution</th><th align="right">Smart Contract Solution</th></tr><tr><td align="right">Sending money abroad</td><td align="right">Banks, 3-5 days, fees</td><td align="right">Direct transfer, minutes, low gas</td></tr><tr><td align="right">Crowdfunding with accountability</td><td align="right">Kickstarter takes 5-10&#37;</td><td align="right">DAO with milestone-based release</td></tr><tr><td align="right">Proving ownership of an asset</td><td align="right">Paper deeds, lawyers</td><td align="right">NFT on-chain</td></tr><tr><td align="right">Earning interest on savings</td><td align="right">Bank gives you 0.5&#37;</td><td align="right">DeFi lending pool, variable rate</td></tr><tr><td align="right">Freelancer payment disputes</td><td align="right">Courts, arbitration</td><td align="right">Escrow contract with conditions</td></tr></table>
+<h2 id="what_incentives_and_mechanisms_can_it_enable"><a href="#what_incentives_and_mechanisms_can_it_enable" class="header-anchor">What Incentives and Mechanisms Can It Enable?</a></h2>
+<p>This is where it gets interesting. Smart contracts let you <em>design</em> incentive structures:</p>
+<h3 id="token_incentives"><a href="#token_incentives" class="header-anchor">Token Incentives</a></h3>
+<ul>
+<li><p><strong>Staking</strong>: &quot;Lock your tokens, earn rewards&quot; — encourages long-term holding</p>
+</li>
+<li><p><strong>Liquidity mining</strong>: &quot;Provide liquidity to a pool, earn tokens&quot; — bootstraps a marketplace</p>
+</li>
+<li><p><strong>Governance tokens</strong>: &quot;Hold tokens, vote on protocol changes&quot; — decentralized decision-making</p>
+</li>
+</ul>
+<h3 id="mechanism_design"><a href="#mechanism_design" class="header-anchor">Mechanism Design</a></h3>
+<ul>
+<li><p><strong>Bonding curves</strong>: Price increases as more tokens are bought — rewards early adopters</p>
+</li>
+<li><p><strong>Quadratic funding</strong>: Small donations get amplified — democratizes funding</p>
+</li>
+<li><p><strong>Commit-reveal schemes</strong>: Vote privately, reveal later — prevents bandwagon effects</p>
+</li>
+<li><p><strong>Time locks</strong>: Funds unlock gradually — prevents rug pulls</p>
+</li>
+</ul>
+<h3 id="game_theory_in_code"><a href="#game_theory_in_code" class="header-anchor">Game Theory in Code</a></h3>
+<p>You&#39;re essentially encoding game theory into immutable rules:</p>
+<pre><code class="language-julia">If player cooperates → reward
+If player defects → slash their stake
+If nobody acts within timeout → refund everyone</code></pre>
+<p>The beauty is that these mechanisms are <strong>credibly neutral</strong>—nobody can change the rules after deployment &#40;unless the contract is explicitly designed to be upgradeable, and even then, upgrades can require community votes&#41;.</p>
+<h2 id="the_actual_roadmap_from_zero_to_deployed"><a href="#the_actual_roadmap_from_zero_to_deployed" class="header-anchor">The Actual Roadmap: From Zero to Deployed</a></h2>
+<p>Here&#39;s the flow that nobody draws on a whiteboard for you:</p>
+<h3 id="phase_1_idea_mental_model"><a href="#phase_1_idea_mental_model" class="header-anchor">Phase 1: Idea → Mental Model</a></h3>
+<p><strong>Don&#39;t write code yet.</strong> Answer these questions first:</p>
+<ol>
+<li><p><strong>What state do I need to track?</strong> &#40;balances, votes, ownership, deadlines&#41;</p>
+</li>
+<li><p><strong>Who can do what?</strong> &#40;anyone can deposit, only owner can withdraw, voters can vote once&#41;</p>
+</li>
+<li><p><strong>What are the transitions?</strong> &#40;deposit → borrow → repay → withdraw&#41;</p>
+</li>
+<li><p><strong>What are the edge cases?</strong> &#40;what if someone tries to withdraw more than they have?&#41;</p>
+</li>
+</ol>
+<blockquote>
+<p><strong>Think in terms of a state machine.</strong> Draw boxes &#40;states&#41; and arrows &#40;transitions&#41;. If your idea can&#39;t be expressed as a state machine, it might not be a good fit for a smart contract. See the <a href="/blog/solidity/math_view/">mathematical framework post</a> for a formal treatment of this.</p>
+</blockquote>
+<h3 id="phase_2_prototype_the_contract"><a href="#phase_2_prototype_the_contract" class="header-anchor">Phase 2: Prototype the Contract</a></h3>
+<p>Now write Solidity. Start minimal:</p>
+<pre><code class="language-solidity">// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract MyIdea &#123;
+    // What state do I need?
+    mapping&#40;address &#61;&gt; uint256&#41; public balances;
+    
+    // What can users do?
+    function deposit&#40;&#41; external payable &#123;
+        balances&#91;msg.sender&#93; &#43;&#61; msg.value;
+    &#125;
+    
+    function withdraw&#40;uint256 amount&#41; external &#123;
+        require&#40;balances&#91;msg.sender&#93; &gt;&#61; amount, &quot;Insufficient balance&quot;&#41;;
+        balances&#91;msg.sender&#93; -&#61; amount;
+        payable&#40;msg.sender&#41;.transfer&#40;amount&#41;;
+    &#125;
+&#125;</code></pre>
+<p><strong>Tools for this phase:</strong></p>
+<ul>
+<li><p><a href="https://remix.ethereum.org">Remix IDE</a> — browser-based, zero setup, great for experimenting</p>
+</li>
+<li><p><a href="https://hardhat.org">Hardhat</a> — local development framework &#40;when you&#39;re ready for a real project&#41;. See the <a href="/blog/solidity/node/">Node.js connection post</a> for setup details.</p>
+</li>
+<li><p><a href="https://getfoundry.sh">Foundry</a> — Rust-based alternative, faster compilation, tests written in Solidity itself</p>
+</li>
+</ul>
+<blockquote>
+<p><strong>Idea first or code first?</strong> Here&#39;s my take: <strong>start with a concrete idea, but keep it small.</strong> Don&#39;t try to build Uniswap on day one. Build a tip jar. Then an escrow. Then a voting contract. Each project teaches you patterns you&#39;ll reuse. The idea gives you direction; the code gives you understanding. You need both, but the idea comes first—even if it&#39;s just &quot;I want to understand how lending works.&quot;</p>
+</blockquote>
+<h3 id="phase_3_test_like_your_money_depends_on_it_it_does"><a href="#phase_3_test_like_your_money_depends_on_it_it_does" class="header-anchor">Phase 3: Test Like Your Money Depends on It &#40;It Does&#41;</a></h3>
+<p>Smart contracts are immutable once deployed. Bugs cost real money. Testing is not optional.</p>
+<pre><code class="language-bash"># With Hardhat
+npx hardhat test
+
+# With Foundry
+forge test</code></pre>
+<p>Write tests for:</p>
+<ul>
+<li><p>✅ Happy path &#40;everything works as expected&#41;</p>
+</li>
+<li><p>❌ Edge cases &#40;zero amounts, overflow, reentrancy&#41;</p>
+</li>
+<li><p>🔒 Access control &#40;only authorized users can call sensitive functions&#41;</p>
+</li>
+<li><p>⏱️ Time-dependent logic &#40;if your contract uses block timestamps&#41;</p>
+</li>
+</ul>
+<p><strong>Test on a local blockchain first</strong> &#40;Hardhat spins one up automatically&#41;, then deploy to a testnet &#40;Sepolia&#41; before touching mainnet.</p>
+<h3 id="phase_4_deploy_to_a_testnet"><a href="#phase_4_deploy_to_a_testnet" class="header-anchor">Phase 4: Deploy to a Testnet</a></h3>
+<pre><code class="language-bash">npx hardhat run scripts/deploy.js --network sepolia</code></pre>
+<p>You&#39;ll need:</p>
+<ul>
+<li><p>A wallet &#40;MetaMask&#41;</p>
+</li>
+<li><p>Test ETH &#40;free from <a href="https://sepoliafaucet.com">faucets</a>&#41;</p>
+</li>
+<li><p>An RPC endpoint &#40;Alchemy or Infura—free tiers are fine&#41;</p>
+</li>
+</ul>
+<blockquote>
+<p><strong>What&#39;s an RPC endpoint?</strong> It&#39;s your app&#39;s &quot;phone line&quot; to the blockchain. You send transactions and read data through it. Alchemy and Infura run Ethereum nodes so you don&#39;t have to. You sign up, get a URL, and plug it into your config. Think of it like using a cloud database instead of running PostgreSQL on your laptop.</p>
+</blockquote>
+<h3 id="phase_5_build_the_frontend_yes_you_still_need_web2"><a href="#phase_5_build_the_frontend_yes_you_still_need_web2" class="header-anchor">Phase 5: Build the Frontend &#40;Yes, You Still Need Web2&#41;</a></h3>
+<p>Here&#39;s the part that surprises people: <strong>your dApp&#39;s frontend is a regular website.</strong> It&#39;s HTML, CSS, JavaScript &#40;or React/Next.js/whatever&#41;, hosted on a regular server or static hosting service.</p>
+<p>The &quot;decentralized&quot; part is just the backend—the smart contract on the blockchain. The frontend talks to it through a library.</p>
+<h4 id="the_frontend_stack"><a href="#the_frontend_stack" class="header-anchor">The Frontend Stack</a></h4>
+<pre><code class="language-julia">┌─────────────────────────────────────────────┐
+│            User&#39;s Browser                    │
+│  ┌───────────────┐    ┌──────────────────┐  │
+│  │  Your Website  │───▶│  Wallet Extension │  │
+│  │  &#40;React, etc.&#41; │    │  &#40;MetaMask&#41;       │  │
+│  └───────┬───────┘    └────────┬─────────┘  │
+│          │                      │            │
+│          │    ethers.js /       │            │
+│          │    wagmi / viem      │            │
+│          │                      │            │
+└──────────┼──────────────────────┼────────────┘
+           │                      │
+           ▼                      ▼
+    ┌──────────────┐     ┌──────────────┐
+    │  RPC Provider │     │  Ethereum    │
+    │  &#40;Alchemy&#41;    │────▶│  Blockchain  │
+    └──────────────┘     └──────────────┘</code></pre>
+<h4 id="key_libraries"><a href="#key_libraries" class="header-anchor">Key Libraries</a></h4>
+<ul>
+<li><p><strong>ethers.js</strong> or <strong>viem</strong> — JavaScript libraries to interact with Ethereum</p>
+</li>
+<li><p><strong>wagmi</strong> — React hooks for Ethereum &#40;built on viem, makes everything easier&#41;</p>
+</li>
+<li><p><strong>RainbowKit</strong> or <strong>ConnectKit</strong> — pre-built &quot;Connect Wallet&quot; buttons</p>
+</li>
+</ul>
+<h4 id="a_minimal_frontend_example"><a href="#a_minimal_frontend_example" class="header-anchor">A Minimal Frontend Example</a></h4>
+<pre><code class="language-javascript">import &#123; ethers &#125; from &#39;ethers&#39;;
+
+// Connect to user&#39;s MetaMask
+const provider &#61; new ethers.BrowserProvider&#40;window.ethereum&#41;;
+const signer &#61; await provider.getSigner&#40;&#41;;
+
+// Connect to your deployed contract
+const contract &#61; new ethers.Contract&#40;
+  &#39;0xYourContractAddress&#39;,
+  &#91;&#39;function deposit&#40;&#41; payable&#39;, &#39;function withdraw&#40;uint256&#41;&#39;&#93;,
+  signer
+&#41;;
+
+// Call a function
+await contract.deposit&#40;&#123; value: ethers.parseEther&#40;&#39;0.1&#39;&#41; &#125;&#41;;</code></pre>
+<h4 id="where_to_host_the_frontend"><a href="#where_to_host_the_frontend" class="header-anchor">Where to Host the Frontend</a></h4>
+<table><tr><th align="right">Option</th><th align="right">Type</th><th align="right">Notes</th></tr><tr><td align="right">Vercel / Netlify</td><td align="right">Centralized</td><td align="right">Easiest, free tier, great DX</td></tr><tr><td align="right">GitHub Pages</td><td align="right">Centralized</td><td align="right">Free, simple for static sites</td></tr><tr><td align="right">IPFS &#43; Fleek</td><td align="right">Decentralized</td><td align="right">Content-addressed, censorship-resistant</td></tr><tr><td align="right">Arweave</td><td align="right">Decentralized</td><td align="right">Permanent storage, pay once</td></tr></table>
+<blockquote>
+<p><strong>The irony</strong>: Most &quot;decentralized apps&quot; have centralized frontends. That&#39;s okay for now. The critical logic &#40;money, rules, state&#41; lives on-chain. The frontend is just a window into it. If your Vercel site goes down, anyone can build a new frontend that talks to the same contract. The contract doesn&#39;t care who&#39;s calling it.</p>
+<p>If you want full decentralization, host on IPFS or Arweave. See the <a href="/blog/decentralized_storage/arweave_intro/">Arweave intro post</a> for more on decentralized storage.</p>
+</blockquote>
+<h3 id="phase_6_deploy_to_mainnet"><a href="#phase_6_deploy_to_mainnet" class="header-anchor">Phase 6: Deploy to Mainnet</a></h3>
+<p>When you&#39;re confident:</p>
+<ol>
+<li><p><strong>Get a security audit</strong> &#40;or at least use <a href="https://github.com/crytic/slither">Slither</a> and <a href="https://github.com/ConsenSys/mythril">Mythril</a> for automated analysis&#41;</p>
+</li>
+<li><p><strong>Deploy to mainnet</strong> &#40;same as testnet, but with real ETH for gas&#41;</p>
+</li>
+<li><p><strong>Verify your contract on Etherscan</strong> &#40;so users can read the source code&#41;</p>
+</li>
+</ol>
+<pre><code class="language-bash">npx hardhat verify --network mainnet 0xYourContractAddress</code></pre>
+<h2 id="the_complete_flow_a_cheat_sheet"><a href="#the_complete_flow_a_cheat_sheet" class="header-anchor">The Complete Flow: A Cheat Sheet</a></h2>
+<pre><code class="language-julia">1. IDEA          &quot;I want to build an escrow service&quot;
+     │
+2. DESIGN        State machine: deposit → confirm → release/refund
+     │
+3. SOLIDITY      Write the contract in Remix or Hardhat
+     │
+4. TEST          Unit tests, edge cases, security checks
+     │
+5. TESTNET       Deploy to Sepolia, test with fake ETH
+     │
+6. FRONTEND      React app &#43; ethers.js &#43; MetaMask integration
+     │
+7. HOST          Deploy frontend to Vercel/Netlify/IPFS
+     │
+8. MAINNET       Deploy contract to Ethereum mainnet
+     │
+9. VERIFY        Verify source code on Etherscan
+     │
+   LIVE 🚀       Users interact through your frontend</code></pre>
+<h2 id="whats_missing_from_the_ecosystem_honest_assessment"><a href="#whats_missing_from_the_ecosystem_honest_assessment" class="header-anchor">What&#39;s Missing From the Ecosystem &#40;Honest Assessment&#41;</a></h2>
+<p>Let&#39;s be real about the gaps:</p>
+<ul>
+<li><p><strong>Debugging is painful.</strong> Transaction reverted? Good luck figuring out which <code>require</code> failed without custom error messages &#40;Solidity 0.8.26&#43; helps with this&#41;.</p>
+</li>
+<li><p><strong>Upgradability is an unsolved tension.</strong> Immutability is a feature, but bugs happen. Proxy patterns exist but add complexity and trust assumptions.</p>
+</li>
+<li><p><strong>Gas estimation is an art.</strong> You won&#39;t know exactly what a transaction costs until it&#39;s mined.</p>
+</li>
+<li><p><strong>Tooling is fragmented.</strong> Hardhat vs Foundry vs Remix vs Truffle—each has tradeoffs. The ecosystem hasn&#39;t converged.</p>
+</li>
+<li><p><strong>User experience is still rough.</strong> &quot;Sign this transaction, pay gas, wait for confirmation&quot; is a terrible UX compared to clicking &quot;Buy Now.&quot;</p>
+</li>
+<li><p><strong>Testing real-world interactions is hard.</strong> Your contract might compose with Uniswap, Aave, Chainlink—testing those interactions locally requires forking mainnet state.</p>
+</li>
+</ul>
+<h2 id="practical_advice"><a href="#practical_advice" class="header-anchor">Practical Advice</a></h2>
+<ol>
+<li><p><strong>Start with Remix.</strong> Don&#39;t fight tooling on day one. Write a contract, deploy it to a test VM, click buttons. Understand what&#39;s happening.</p>
+</li>
+<li><p><strong>Move to Hardhat/Foundry when you need tests.</strong> Once your contract does something non-trivial, you need automated tests.</p>
+</li>
+<li><p><strong>Read other contracts.</strong> <a href="https://github.com/OpenZeppelin/openzeppelin-contracts">OpenZeppelin</a> is the gold standard. Their ERC-20, ERC-721, and access control implementations teach you patterns you&#39;ll use everywhere.</p>
+</li>
+<li><p><strong>Don&#39;t over-decentralize.</strong> Not everything needs to be on-chain. Store large data off-chain &#40;IPFS, Arweave&#41;. Keep your contract lean.</p>
+</li>
+<li><p><strong>Think about gas costs constantly.</strong> Every <code>SSTORE</code> &#40;writing to storage&#41; costs ~20,000 gas. Loops over unbounded arrays? That&#39;s a potential DoS vector. <code>memory</code> is cheap, <code>storage</code> is expensive.</p>
+</li>
+<li><p><strong>The frontend is the easy part.</strong> If you know React &#40;or any web framework&#41;, building a dApp frontend is just calling an API—except the API is the blockchain. Libraries like wagmi make this almost trivial.</p>
+</li>
+</ol>
+<h2 id="where_to_go_from_here"><a href="#where_to_go_from_here" class="header-anchor">Where to Go From Here</a></h2>
+<p>If you&#39;re reading this blog in order, you&#39;ve already seen <a href="/blog/solidity/basics/">Solidity syntax and patterns</a>, the <a href="/blog/solidity/math_view/">mathematical framework</a>, and a <a href="/blog/solidity/lending_app/">full lending protocol example</a>. </p>
+<p>The next step is to <strong>pick a small idea and build it end-to-end.</strong> Not just the contract—the tests, the deployment script, and the frontend. The roadmap above is your checklist. Go build something.</p>
+<div class="page-foot">
+    Contact me by <a href="mailto:skchu@wustl.edu">E-mail</a> | <a href="https://github.com/kchu25">Github</a> | <a href="https://www.linkedin.com/in/kchu1/">Linkedin</a>
+    <br>
+    This work is licensed under <a href="http://creativecommons.org/licenses/by-sa/4.0/">CC BY-SA 4.0</a>.  Last modified: February 21, 2026.
+    <br>
+    Website built with <a href="https://github.com/tlienart/Franklin.jl">Franklin.jl</a> and the <a href="https://julialang.org">Julia language</a>.
+</div>
+</div><!-- CONTENT ENDS HERE -->
+    
+    
+        <script src="/libs/highlight/highlight.min.js"></script>
+<script>
+// Register Solidity language for highlight.js
+hljs.registerLanguage('solidity', function(hljs) {
+  return {
+    keywords: {
+      keyword: 'contract interface library pragma import using struct enum event modifier function returns return require revert assert emit new delete if else for while do break continue try catch throw this super constructor fallback receive ' +
+                'public private internal external pure view payable virtual override constant immutable anonymous indexed storage memory calldata',
+      literal: 'true false wei gwei ether seconds minutes hours days weeks years',
+      built_in: 'msg block tx abi now sender value gas data origin gasprice blockhash gasleft address uint int bytes string bool mapping'
+    },
+    contains: [
+      hljs.C_LINE_COMMENT_MODE,
+      hljs.C_BLOCK_COMMENT_MODE,
+      hljs.QUOTE_STRING_MODE,
+      hljs.APOS_STRING_MODE,
+      {
+        className: 'number',
+        begin: '\\b(0[xX][a-fA-F0-9]+|(\\d+(\\.\\d*)?|\\.\\d+)([eE][-+]?\\d+)?)',
+        relevance: 0
+      },
+      {
+        className: 'type',
+        begin: '\\b(uint|int|bytes|byte|string|address|bool|ufixed|fixed)(\\d+x\\d+|\\d+)?\\b'
+      },
+      {
+        className: 'function',
+        beginKeywords: 'function modifier event constructor fallback receive',
+        end: '[{;]',
+        excludeEnd: true,
+        contains: [
+          {
+            className: 'title',
+            begin: '[A-Za-z$_][0-9A-Za-z$_]*',
+            relevance: 0
+          },
+          {
+            className: 'params',
+            begin: '\\(', end: '\\)',
+            contains: [hljs.C_LINE_COMMENT_MODE, hljs.C_BLOCK_COMMENT_MODE]
+          }
+        ]
+      }
+    ]
+  };
+});
+
+hljs.highlightAll();
+hljs.configure({tabReplace: '    '});
+</script>
+
+
+    
+  </body>
+</html>
