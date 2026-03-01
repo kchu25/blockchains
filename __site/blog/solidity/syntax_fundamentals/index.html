@@ -1,0 +1,647 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@700;900&display=swap" rel="stylesheet">
+  <style>
+    @font-face {
+      font-family: 'BPdots';
+      src: url('/blockchains/assets/fonts/BPdots/BPdots.otf') format('opentype');
+      font-weight: normal;
+      font-style: normal;
+    }
+    @font-face {
+      font-family: 'BPdots';
+      src: url('/blockchains/assets/fonts/BPdots/BPdotsBold.otf') format('opentype');
+      font-weight: bold;
+      font-style: normal;
+    }
+  </style>
+   <link rel="stylesheet" href="/libs/katex/katex.min.css">
+     
+   <link rel="stylesheet" href="/libs/highlight/styles/atom-one-dark.min.css">
+   
+  <link rel="stylesheet" href="/css/franklin.css">
+<link rel="stylesheet" href="/css/hypertext.css">
+<link rel="icon" href="/assets/favicon.png">
+
+   <title>Solidity Syntax & Fundamentals: The Plumbing</title>  
+</head>
+<body>
+<header>
+  <h1 style="color:#283747; font-family:'BPdots', monospace; font-size:2.5em; font-weight:normal; letter-spacing:0.1em">blockchains</h1>
+  <nav>
+    <a href="/" class="current">Tags</a>
+  | <a href="/blog/" >Notes</a>
+  <hr/>
+  </nav>
+</header>
+
+
+<!-- Content appended here -->
+<div class="franklin-content"><h1 id="solidity_syntax_fundamentals_the_plumbing"><a href="#solidity_syntax_fundamentals_the_plumbing" class="header-anchor">Solidity Syntax &amp; Fundamentals: The Plumbing</a></h1>
+<p><strong>TL;DR:</strong> This post covers the <em>syntax primitives</em> of Solidity—the building blocks from which all contracts are constructed. No design patterns, no architecture—just the language itself: types, values, control flow, state, and function signatures. Think of it as learning the grammar before writing essays.</p>
+<hr />
+<h2 id="part_1_core_ideathe_state_machine"><a href="#part_1_core_ideathe_state_machine" class="header-anchor">Part 1: Core Idea—The State Machine</a></h2>
+<p>Before any syntax, understand what Solidity <em>is</em>: it&#39;s a language for programming <strong>state machines</strong> that live on a blockchain.</p>
+<p>Formally, a Solidity contract is a tuple:</p>
+\[\mathcal{C} = (\Sigma, s_0, \mathcal{T})\]
+<p>where:</p>
+<ul>
+<li><p>\(\Sigma\) &#61; the <strong>state space</strong> &#40;all possible values of state variables&#41;</p>
+</li>
+<li><p>\(s_0 \in \Sigma\) &#61; the <strong>initial state</strong> &#40;set in constructor&#41;</p>
+</li>
+<li><p>\(\mathcal{T}: \Sigma \times \mathcal{M} \to \Sigma \cup \{\bot\}\) &#61; the <strong>transition function</strong> &#40;functions map messages to new states, or \(\bot\) for revert&#41;</p>
+</li>
+</ul>
+<p>When someone calls a function, they send a message \(m \in \mathcal{M}\) to the contract. The contract&#39;s state transitions according to \(\mathcal{T}\), or reverts if \(\mathcal{T}(s, m) = \bot\).</p>
+<pre><code class="language-solidity">contract Counter &#123;
+    uint256 public count &#61; 0;  // Part of Σ; s₀ &#61; &#40;count: 0&#41;
+    
+    function increment&#40;&#41; public &#123;  // Function that defines T
+        count &#43;&#61; 1;  // State transition
+    &#125;
+&#125;</code></pre>
+<p><strong>Everything</strong> in Solidity—types, functions, modifiers, events—is machinery for defining and managing this state machine.</p>
+<hr />
+<h2 id="part_2_typesthe_values_in_σ"><a href="#part_2_typesthe_values_in_σ" class="header-anchor">Part 2: Types—The Values in Σ</a></h2>
+<h3 id="primitives"><a href="#primitives" class="header-anchor">Primitives</a></h3>
+<p>Solidity&#39;s primitive types form a finite, ordered set of values. Each has a fixed size &#40;in bits&#41; and semantics &#40;how operations work on them&#41;.</p>
+<h4 id="unsigned_integers"><a href="#unsigned_integers" class="header-anchor">Unsigned Integers</a></h4>
+\[\text{uint}\langle n \rangle : n \in \{8, 16, 32, \ldots, 256\}, n \equiv 0 \pmod{8}\]
+<p>Maps to integers \(\{0, 1, \ldots, 2^n - 1\}\).</p>
+<pre><code class="language-solidity">uint8 small &#61; 255;        // Range: &#91;0, 255&#93;
+uint256 large &#61; 2**256-1; // Range: &#91;0, 2^256 - 1&#93;
+uint x &#61; 5;               // uint ≡ uint256 &#40;default&#41;</code></pre>
+<p><strong>Overflow behavior &#40;Solidity 0.8&#43;&#41;:</strong> Addition/subtraction checks for overflow; reverts if \(x + y > 2^n - 1\).</p>
+<pre><code class="language-solidity">uint8 x &#61; 255;
+x &#43;&#61; 1;  // Reverts&#33; &#40;255 &#43; 1 &gt; 255&#41;</code></pre>
+<h4 id="signed_integers"><a href="#signed_integers" class="header-anchor">Signed Integers</a></h4>
+\[\text{int}\langle n \rangle : n \in \{8, 16, 32, \ldots, 256\}, n \equiv 0 \pmod{8}\]
+<p>Maps to integers \(\{-2^{n-1}, \ldots, -1, 0, 1, \ldots, 2^{n-1} - 1\}\).</p>
+<pre><code class="language-solidity">int8 x &#61; -128;   // Range: &#91;-128, 127&#93;
+int256 y &#61; -1;</code></pre>
+<h4 id="fixed-point_numbers_rarely_used"><a href="#fixed-point_numbers_rarely_used" class="header-anchor">Fixed-Point Numbers &#40;Rarely Used&#41;</a></h4>
+\[\text{ufixed}\langle m \times n \rangle, \text{fixed}\langle m \times n \rangle\]
+<p>where \(m + n = 256\). Represents rational numbers: the \(n\) least-significant bits are fractional.</p>
+<pre><code class="language-solidity">ufixed128x128 price &#61; 1.5; // Not commonly used; beware precision loss</code></pre>
+<h4 id="boolean"><a href="#boolean" class="header-anchor">Boolean</a></h4>
+\[\mathbb{B} = \{\text{true}, \text{false}\}\]
+<pre><code class="language-solidity">bool flag &#61; true;
+bool result &#61; &#40;x &gt; 5&#41; &amp;&amp; &#40;y &lt; 10&#41;;  // Result of logical operations</code></pre>
+<h4 id="bytes_fixed_and_dynamic"><a href="#bytes_fixed_and_dynamic" class="header-anchor">Bytes &#40;Fixed and Dynamic&#41;</a></h4>
+<p><strong>Fixed-size:</strong></p>
+\[\text{bytes}\langle n \rangle : n \in \{1, 2, \ldots, 32\}\]
+<p>A fixed-size byte array. Stored as-is &#40;no implicit padding&#41;.</p>
+<pre><code class="language-solidity">bytes32 hash &#61; keccak256&#40;&quot;hello&quot;&#41;;  // Result of hash function
+bytes4 selector &#61; 0x12345678;       // Function selector
+bytes1 x &#61; 0xFF;                    // Single byte</code></pre>
+<p><strong>Dynamic:</strong></p>
+\[\text{bytes} = \text{sequence of bytes of arbitrary length}\]
+<p>More on this under &quot;Reference Types&quot; below.</p>
+<h4 id="address"><a href="#address" class="header-anchor">Address</a></h4>
+\[\text{address} \cong \{0, 1\}^{160}\]
+<p>A 160-bit &#40;20-byte&#41; Ethereum address. Represents an account &#40;externally owned or contract&#41;.</p>
+<pre><code class="language-solidity">address user &#61; 0x742d35Cc6634C0532925a3b844Bc9e7595f42bE3;
+address zero &#61; address&#40;0&#41;;  // Special: zero address &#40;null&#41;
+
+address payable wallet &#61; payable&#40;user&#41;;  // Can receive ether</code></pre>
+<p><strong>Two subtypes:</strong></p>
+<ul>
+<li><p><code>address</code> — read-only</p>
+</li>
+<li><p><code>address payable</code> — can send ether to it</p>
+</li>
+</ul>
+<h3 id="composite_types_structs"><a href="#composite_types_structs" class="header-anchor">Composite Types: Structs</a></h3>
+<p>Group multiple fields together &#40;like a struct in C&#41;:</p>
+<pre><code class="language-solidity">struct User &#123;
+    string name;
+    uint256 age;
+    address wallet;
+&#125;
+
+User alice &#61; User&#40;&quot;Alice&quot;, 30, 0x123...&#41;;
+uint256 aliceAge &#61; alice.age;  // Field access</code></pre>
+<p>Formally, a struct is a tuple:</p>
+\[\mathcal{S} = (f_1: T_1, f_2: T_2, \ldots, f_k: T_k)\]
+<p>where each \(f_i\) is a field name and \(T_i\) is its type.</p>
+<h3 id="enums"><a href="#enums" class="header-anchor">Enums</a></h3>
+<p>A set of named constants:</p>
+<pre><code class="language-solidity">enum Status &#123; Pending, Active, Completed &#125;
+
+Status currentStatus &#61; Status.Active;
+uint8 encoded &#61; uint8&#40;Status.Pending&#41;;  // Encodes to 0</code></pre>
+<p>Formally, an enum is a finite set: \(\mathcal{E} = \{e_0, e_1, \ldots, e_{n-1}\}\), encoded as integers \(\{0, 1, \ldots, n-1\}\).</p>
+<h3 id="reference_types_arrays"><a href="#reference_types_arrays" class="header-anchor">Reference Types: Arrays</a></h3>
+<h4 id="fixed-size_arrays"><a href="#fixed-size_arrays" class="header-anchor">Fixed-Size Arrays</a></h4>
+\[T[n] = \{(a_0, a_1, \ldots, a_{n-1}) : a_i \in T\}\]
+<pre><code class="language-solidity">uint256&#91;3&#93; fixedArray &#61; &#91;1, 2, 3&#93;;
+address&#91;10&#93; addresses;
+
+fixedArray&#91;0&#93; &#61; 100;  // Index 0
+addresses.length;     // Always 10</code></pre>
+<h4 id="dynamic_arrays"><a href="#dynamic_arrays" class="header-anchor">Dynamic Arrays</a></h4>
+\[T[\,] = \bigcup_{n \geq 0} T[n]\]
+<p>Variable-length arrays. Can grow/shrink.</p>
+<pre><code class="language-solidity">uint256&#91;&#93; dynamicArray;
+
+dynamicArray.push&#40;10&#41;;      // Append
+dynamicArray.pop&#40;&#41;;         // Remove last
+dynamicArray.length;        // Current length
+uint256 first &#61; dynamicArray&#91;0&#93;;  // Access</code></pre>
+<h4 id="mappings"><a href="#mappings" class="header-anchor">Mappings</a></h4>
+\[T_1 \mapsto T_2 = T_1 \to T_2 \cup \{\bot\}\]
+<p>A key-value store &#40;like a hash table&#41;. Maps keys of type \(T_1\) to values of type \(T_2\). Unset keys map to zero/default value.</p>
+<pre><code class="language-solidity">mapping&#40;address &#61;&gt; uint256&#41; balances;  // Address → balance
+
+balances&#91;user&#93; &#61; 100;           // Set
+uint256 bal &#61; balances&#91;user&#93;;   // Get &#40;returns 0 if unset&#41;
+delete balances&#91;user&#93;;          // Reset to default</code></pre>
+<p><strong>Key insight:</strong> Mappings have no <code>.length</code>, no iteration, no default value—you get the type&#39;s zero value if a key is unset. This is intentional for gas efficiency.</p>
+<p><strong>Allowed key types:</strong> Any value type &#40;not arrays, structs, or other mappings&#41;.</p>
+<h4 id="strings"><a href="#strings" class="header-anchor">Strings</a></h4>
+\[\text{string} = \text{sequence of UTF-8 characters}\]
+<p>Dynamically sized byte sequence &#40;really <code>bytes</code>&#41;.</p>
+<pre><code class="language-solidity">string greeting &#61; &quot;hello&quot;;
+bytes data &#61; bytes&#40;greeting&#41;;  // Convert to bytes
+uint256 len &#61; bytes&#40;greeting&#41;.length;  // Get length</code></pre>
+<p><strong>Caution:</strong> No native string operations &#40;concatenation is expensive&#41;. Usually convert to <code>bytes</code> for manipulation.</p>
+<hr />
+<h2 id="part_3_state_variablesthe_persistent_sigma"><a href="#part_3_state_variablesthe_persistent_sigma" class="header-anchor">Part 3: State Variables—The Persistent \(\Sigma\)</a></h2>
+<p>State variables live on the blockchain permanently. They comprise the contract&#39;s state \(\Sigma\).</p>
+<pre><code class="language-solidity">contract Storage &#123;
+    uint256 public count &#61; 0;           // Public state variable
+    address private owner &#61; msg.sender; // Private &#40;not readable directly&#41;
+    mapping&#40;address &#61;&gt; uint256&#41; ledger; // State variable &#40;mapping&#41;
+&#125;</code></pre>
+<h3 id="access_modifiers"><a href="#access_modifiers" class="header-anchor">Access Modifiers</a></h3>
+<ul>
+<li><p><strong><code>public</code></strong> — accessible from anywhere &#40;outside, within contract, via calls&#41;. Automatically generates a getter function.</p>
+</li>
+<li><p><strong><code>internal</code></strong> — accessible within this contract and subcontracts only.</p>
+</li>
+<li><p><strong><code>private</code></strong> — accessible within this contract only &#40;not even subcontracts&#41;.</p>
+</li>
+</ul>
+<p><strong>Note:</strong> <code>private</code> and <code>internal</code> don&#39;t mean &quot;secret&quot;—blockchain is transparent. Anyone can read all state by querying the chain.</p>
+<h3 id="initial_values"><a href="#initial_values" class="header-anchor">Initial Values</a></h3>
+<pre><code class="language-solidity">uint256 x &#61; 10;              // Set at compile time
+address deployer &#61; msg.sender; // Set at deploy time &#40;constructor runs&#41;</code></pre>
+<p>Uninitialized state variables get the <strong>zero value</strong> of their type:</p>
+<ul>
+<li><p><code>uint256</code>: 0</p>
+</li>
+<li><p><code>bool</code>: false</p>
+</li>
+<li><p><code>address</code>: 0x0</p>
+</li>
+<li><p><code>string</code>/<code>bytes</code>: &quot;&quot;</p>
+</li>
+<li><p>Arrays: empty array</p>
+</li>
+<li><p>Mappings: empty map</p>
+</li>
+</ul>
+<hr />
+<h2 id="part_4_functionsthe_transition_function_mathcalt"><a href="#part_4_functionsthe_transition_function_mathcalt" class="header-anchor">Part 4: Functions—The Transition Function \(\mathcal{T}\)</a></h2>
+<p>A function defines how state changes in response to a call.</p>
+<h3 id="basic_syntax"><a href="#basic_syntax" class="header-anchor">Basic Syntax</a></h3>
+<pre><code class="language-solidity">function myFunction&#40;uint256 x, address to&#41; public returns &#40;uint256, bool&#41; &#123;
+    // Function body
+    return &#40;42, true&#41;;
+&#125;</code></pre>
+<p><strong>Signature:</strong> \((T_1, T_2, \ldots, T_k) \to (R_1, R_2, \ldots, R_m)\)</p>
+<p>where \(T_i\) are parameter types and \(R_j\) are return types.</p>
+<h3 id="visibility_modifiers"><a href="#visibility_modifiers" class="header-anchor">Visibility Modifiers</a></h3>
+<ul>
+<li><p><strong><code>public</code></strong> — callable from outside, within contract, by subcontracts. Generates external interface.</p>
+</li>
+<li><p><strong><code>internal</code></strong> — callable only within contract and subcontracts.</p>
+</li>
+<li><p><strong><code>external</code></strong> — callable only from outside &#40;not from within&#41;. Cheaper gas if called externally.</p>
+</li>
+<li><p><strong><code>private</code></strong> — callable only within this contract.</p>
+</li>
+</ul>
+<pre><code class="language-solidity">contract Visibility &#123;
+    function pub&#40;&#41; public &#123; &#125;            // Can call: anywhere
+    function ext&#40;&#41; external &#123; &#125;          // Can call: from outside only
+    function int&#40;&#41; internal &#123; &#125;          // Can call: within contract
+    function priv&#40;&#41; private &#123; &#125;          // Can call: this contract only
+&#125;</code></pre>
+<p><strong>When to use <code>external</code>?</strong> When a function is never called internally. It&#39;s cheaper for external callers.</p>
+<h3 id="state-modifying_functions"><a href="#state-modifying_functions" class="header-anchor">State-Modifying Functions</a></h3>
+<p>A function that changes state:</p>
+<pre><code class="language-solidity">function increment&#40;&#41; public &#123;
+    count &#43;&#61; 1;  // Modifies state
+&#125;</code></pre>
+<p>No return type needed if it doesn&#39;t return anything.</p>
+<h3 id="view_and_pure_functions"><a href="#view_and_pure_functions" class="header-anchor">View and Pure Functions</a></h3>
+<p><strong><code>view</code></strong> — reads state but doesn&#39;t modify it. Free to call &#40;no gas cost for reading&#41;.</p>
+<pre><code class="language-solidity">function getCount&#40;&#41; public view returns &#40;uint256&#41; &#123;
+    return count;  // Reads state, doesn&#39;t modify
+&#125;</code></pre>
+<p><strong><code>pure</code></strong> — doesn&#39;t read or modify state. Computationally deterministic.</p>
+<pre><code class="language-solidity">function add&#40;uint256 a, uint256 b&#41; public pure returns &#40;uint256&#41; &#123;
+    return a &#43; b;  // Pure function: just math
+&#125;</code></pre>
+<p><strong>Why distinguish?</strong> The EVM treats <code>view</code>/<code>pure</code> specially: they execute locally &#40;on your node&#41; without needing consensus. State-modifying functions require a transaction and gas payment.</p>
+<h3 id="payable_functions"><a href="#payable_functions" class="header-anchor">Payable Functions</a></h3>
+<p>Functions that accept ether &#40;ETH&#41;:</p>
+<pre><code class="language-solidity">function deposit&#40;&#41; public payable &#123;
+    balances&#91;msg.sender&#93; &#43;&#61; msg.value;  // msg.value &#61; ether sent
+&#125;</code></pre>
+<p>Only <code>payable</code> functions can receive ether. If you send ether to a non-payable function, it reverts.</p>
+<h3 id="special_variables"><a href="#special_variables" class="header-anchor">Special Variables</a></h3>
+<p>Inside a function, you have access to:</p>
+<table><tr><th align="right">Variable</th><th align="right">Type</th><th align="right">Meaning</th></tr><tr><td align="right"><code>msg.sender</code></td><td align="right"><code>address</code></td><td align="right">Who called this function</td></tr><tr><td align="right"><code>msg.value</code></td><td align="right"><code>uint256</code></td><td align="right">How much ether &#40;in wei&#41; was sent</td></tr><tr><td align="right"><code>msg.data</code></td><td align="right"><code>bytes</code></td><td align="right">The raw call data</td></tr><tr><td align="right"><code>block.number</code></td><td align="right"><code>uint256</code></td><td align="right">Current block number</td></tr><tr><td align="right"><code>block.timestamp</code></td><td align="right"><code>uint256</code></td><td align="right">Current block timestamp &#40;Unix time&#41;</td></tr><tr><td align="right"><code>address&#40;this&#41;</code></td><td align="right"><code>address</code></td><td align="right">This contract&#39;s address</td></tr><tr><td align="right"><code>this.balance</code></td><td align="right"><code>uint256</code></td><td align="right">This contract&#39;s ether balance</td></tr></table>
+<p>Example:</p>
+<pre><code class="language-solidity">function withdraw&#40;&#41; public &#123;
+    require&#40;msg.sender &#61;&#61; owner, &quot;Only owner&quot;&#41;;
+    payable&#40;msg.sender&#41;.transfer&#40;address&#40;this&#41;.balance&#41;;
+&#125;</code></pre>
+<h3 id="return_values"><a href="#return_values" class="header-anchor">Return Values</a></h3>
+<pre><code class="language-solidity">// Single return
+function getValue&#40;&#41; public view returns &#40;uint256&#41; &#123;
+    return 42;
+&#125;
+
+// Multiple returns &#40;implicit naming&#41;
+function getMultiple&#40;&#41; public view returns &#40;uint256, bool&#41; &#123;
+    return &#40;42, true&#41;;
+&#125;
+
+// Named returns &#40;can omit explicit return&#41;
+function getNamed&#40;&#41; public view returns &#40;uint256 x, bool y&#41; &#123;
+    x &#61; 42;
+    y &#61; true;
+    // implicit: return &#40;x, y&#41;;
+&#125;</code></pre>
+<hr />
+<h2 id="part_5_control_flow"><a href="#part_5_control_flow" class="header-anchor">Part 5: Control Flow</a></h2>
+<h3 id="ifelse"><a href="#ifelse" class="header-anchor">If/Else</a></h3>
+<pre><code class="language-solidity">if &#40;x &gt; 0&#41; &#123;
+    // ...
+&#125; else if &#40;x &lt; 0&#41; &#123;
+    // ...
+&#125; else &#123;
+    // ...
+&#125;</code></pre>
+<h3 id="loops"><a href="#loops" class="header-anchor">Loops</a></h3>
+<pre><code class="language-solidity">// For loop
+for &#40;uint256 i &#61; 0; i &lt; 10; i&#43;&#43;&#41; &#123;
+    // ...
+&#125;
+
+// While loop
+while &#40;x &gt; 0&#41; &#123;
+    x--;
+&#125;
+
+// Do-while
+do &#123;
+    x--;
+&#125; while &#40;x &gt; 0&#41;;</code></pre>
+<p><strong>Warning:</strong> Unbounded loops are dangerous—they can exceed gas limits and revert. Always bound loops.</p>
+<h3 id="exception_handling"><a href="#exception_handling" class="header-anchor">Exception Handling</a></h3>
+<p><strong><code>require</code></strong> — check condition, revert if false &#40;provides refund of unused gas&#41;:</p>
+<pre><code class="language-solidity">require&#40;balance &gt;&#61; amount, &quot;Insufficient balance&quot;&#41;;
+balance -&#61; amount;</code></pre>
+<p><strong><code>assert</code></strong> — check condition, revert if false &#40;consumes all gas, shouldn&#39;t be used for normal validation&#41;:</p>
+<pre><code class="language-solidity">assert&#40;x &gt; 0&#41;;  // Only for invariants; shouldn&#39;t fail in normal operation</code></pre>
+<p><strong><code>revert</code></strong> — explicitly abort:</p>
+<pre><code class="language-solidity">if &#40;x &#61;&#61; 0&#41; &#123;
+    revert&#40;&quot;x cannot be zero&quot;&#41;;
+&#125;</code></pre>
+<p><strong><code>try-catch</code></strong> — handle exceptions from external calls &#40;rare&#41;:</p>
+<pre><code class="language-solidity">try externalContract.riskySomething&#40;&#41; &#123;
+    // Success
+&#125; catch &#123;
+    // Handle error
+&#125;</code></pre>
+<hr />
+<h2 id="part_6_modifiersreusable_conditions"><a href="#part_6_modifiersreusable_conditions" class="header-anchor">Part 6: Modifiers—Reusable Conditions</a></h2>
+<p>A <strong>modifier</strong> is a code snippet that guards a function &#40;checks a condition before running&#41;.</p>
+<pre><code class="language-solidity">modifier onlyOwner&#40;&#41; &#123;
+    require&#40;msg.sender &#61;&#61; owner, &quot;Only owner&quot;&#41;;
+    _;  // Underscore: &quot;execute function body here&quot;
+&#125;
+
+function doAdminThing&#40;&#41; public onlyOwner &#123;
+    // Function body only runs if modifier passes
+    count &#43;&#61; 1;
+&#125;</code></pre>
+<p>Formally, a modifier is a function transformer:</p>
+\[\text{modifier}(f) = \lambda m. \text{check}(m) \to \text{call}(f, m)\]
+<p>where <code>check&#40;m&#41;</code> is the guard condition, and <code>call&#40;f, m&#41;</code> executes the function.</p>
+<p>You can stack modifiers:</p>
+<pre><code class="language-solidity">function complexFunction&#40;&#41; public onlyOwner nonReentrant &#123;
+    // Runs checks from both onlyOwner and nonReentrant before executing
+&#125;</code></pre>
+<hr />
+<h2 id="part_7_eventsobservable_state_changes"><a href="#part_7_eventsobservable_state_changes" class="header-anchor">Part 7: Events—Observable State Changes</a></h2>
+<p>Events are logs of what happened. They&#39;re stored in transaction receipts and indexed by clients, but <em>not</em> in contract state.</p>
+<pre><code class="language-solidity">event Transfer&#40;address indexed from, address indexed to, uint256 amount&#41;;
+
+function sendToken&#40;address to, uint256 amount&#41; public &#123;
+    balances&#91;msg.sender&#93; -&#61; amount;
+    balances&#91;to&#93; &#43;&#61; amount;
+    emit Transfer&#40;msg.sender, to, amount&#41;;  // Log the event
+&#125;</code></pre>
+<p><strong>Why?</strong> Events are cheap &#40;logs are not state, so they don&#39;t cost storage&#41;, and they let external systems &#40;like web frontends&#41; listen to what happened.</p>
+<p><strong><code>indexed</code> keyword:</strong> Makes the parameter searchable &#40;filters can query by this value&#41;.</p>
+<pre><code class="language-solidity">event Transfer&#40;address indexed from, address indexed to, uint256 amount&#41;;
+// Clients can filter: &quot;Give me all transfers from address X&quot;</code></pre>
+<hr />
+<h2 id="part_8_constructorinitialization"><a href="#part_8_constructorinitialization" class="header-anchor">Part 8: Constructor—Initialization</a></h2>
+<p>Runs once, when the contract is deployed:</p>
+<pre><code class="language-solidity">contract Counter &#123;
+    address public owner;
+    
+    constructor&#40;&#41; &#123;
+        owner &#61; msg.sender;  // Deployer is owner
+    &#125;
+&#125;</code></pre>
+<p>After the constructor finishes, the contract&#39;s initial state is set and the contract lives on the blockchain forever.</p>
+<hr />
+<h2 id="part_9_type_conversions"><a href="#part_9_type_conversions" class="header-anchor">Part 9: Type Conversions</a></h2>
+<h3 id="implicit_conversions"><a href="#implicit_conversions" class="header-anchor">Implicit Conversions</a></h3>
+<p>Solidity allows safe implicit conversions:</p>
+<pre><code class="language-solidity">uint8 small &#61; 5;
+uint256 large &#61; small;  // Implicit: uint8 → uint256 &#40;safe&#41;</code></pre>
+<p>Unsafe conversions must be explicit:</p>
+<pre><code class="language-solidity">uint256 x &#61; 300;
+uint8 y &#61; uint8&#40;x&#41;;  // Explicit: loses information &#40;y &#61; 44, wraps around&#41;</code></pre>
+<h3 id="conversions_via_constructor"><a href="#conversions_via_constructor" class="header-anchor">Conversions via Constructor</a></h3>
+<pre><code class="language-solidity">address user &#61; 0x742d35Cc6634C0532925a3b844Bc9e7595f42bE3;
+uint256 encoded &#61; uint256&#40;uint160&#40;user&#41;&#41;;  // Convert address to uint256
+
+address recovered &#61; address&#40;uint160&#40;encoded&#41;&#41;;  // Convert back</code></pre>
+<hr />
+<h2 id="part_10_operator_precedence_semantics"><a href="#part_10_operator_precedence_semantics" class="header-anchor">Part 10: Operator Precedence &amp; Semantics</a></h2>
+<h3 id="arithmetic"><a href="#arithmetic" class="header-anchor">Arithmetic</a></h3>
+<pre><code class="language-solidity">uint256 sum &#61; a &#43; b;
+uint256 diff &#61; a - b;      // Underflow reverts &#40;0.8&#43;&#41;
+uint256 product &#61; a * b;
+uint256 quotient &#61; a / b;  // Integer division &#40;truncates&#41;
+uint256 remainder &#61; a &#37; b;
+uint256 power &#61; a ** b;    // Exponentiation &#40;expensive&#33;&#41;</code></pre>
+<p><strong>Division by zero reverts.</strong></p>
+<h3 id="comparison"><a href="#comparison" class="header-anchor">Comparison</a></h3>
+<pre><code class="language-solidity">bool eq &#61; a &#61;&#61; b;
+bool ne &#61; a &#33;&#61; b;
+bool lt &#61; a &lt; b;
+bool le &#61; a &lt;&#61; b;
+bool gt &#61; a &gt; b;
+bool ge &#61; a &gt;&#61; b;</code></pre>
+<h3 id="logical"><a href="#logical" class="header-anchor">Logical</a></h3>
+<pre><code class="language-solidity">bool and &#61; &#40;a &amp;&amp; b&#41;;  // Short-circuit: if a is false, b not evaluated
+bool or &#61; &#40;a || b&#41;;   // Short-circuit: if a is true, b not evaluated
+bool not &#61; &#33;a;</code></pre>
+<h3 id="bitwise"><a href="#bitwise" class="header-anchor">Bitwise</a></h3>
+<pre><code class="language-solidity">uint256 and &#61; a &amp; b;
+uint256 or &#61; a | b;
+uint256 xor &#61; a ^ b;
+uint256 not &#61; ~a;
+uint256 shl &#61; a &lt;&lt; n;  // Shift left
+uint256 shr &#61; a &gt;&gt; n;  // Shift right</code></pre>
+<hr />
+<h2 id="part_11_special_patterns"><a href="#part_11_special_patterns" class="header-anchor">Part 11: Special Patterns</a></h2>
+<h3 id="safe_math_08"><a href="#safe_math_08" class="header-anchor">Safe Math &#40;0.8&#43;&#41;</a></h3>
+<p>Solidity 0.8&#43; has <strong>checked arithmetic by default</strong>:</p>
+<pre><code class="language-solidity">uint256 x &#61; 2**256 - 1;
+x &#43;&#61; 1;  // Reverts &#40;overflow protection&#41;</code></pre>
+<p>To get unchecked arithmetic &#40;for optimization&#41;, use:</p>
+<pre><code class="language-solidity">unchecked &#123;
+    uint256 x &#61; 2**256 - 1;
+    x &#43;&#61; 1;  // Wraps around to 0 &#40;no revert&#41;
+&#125;</code></pre>
+<h3 id="fallback_functions"><a href="#fallback_functions" class="header-anchor">Fallback Functions</a></h3>
+<p>Called when no matching function is found:</p>
+<pre><code class="language-solidity">fallback&#40;&#41; external payable &#123;
+    // Handles unknown function calls
+&#125;
+
+receive&#40;&#41; external payable &#123;
+    // Handles plain ether transfers &#40;no function call&#41;
+&#125;</code></pre>
+<p>Only one <code>receive&#40;&#41;</code> per contract; only one <code>fallback&#40;&#41;</code> per contract.</p>
+<h3 id="errors_084"><a href="#errors_084" class="header-anchor">Errors &#40;0.8.4&#43;&#41;</a></h3>
+<p>Modern way to express failures &#40;cheaper than <code>require</code>&#41;:</p>
+<pre><code class="language-solidity">error InsufficientBalance&#40;uint256 available, uint256 required&#41;;
+
+function withdraw&#40;uint256 amount&#41; public &#123;
+    if &#40;balance &lt; amount&#41; &#123;
+        revert InsufficientBalance&#40;balance, amount&#41;;
+    &#125;
+    balance -&#61; amount;
+&#125;</code></pre>
+<hr />
+<h2 id="part_12_contract_inheritance"><a href="#part_12_contract_inheritance" class="header-anchor">Part 12: Contract Inheritance</a></h2>
+<p>Contracts can inherit from other contracts:</p>
+<pre><code class="language-solidity">contract Base &#123;
+    uint256 public x &#61; 10;
+    
+    function getValue&#40;&#41; public view returns &#40;uint256&#41; &#123;
+        return x;
+    &#125;
+&#125;
+
+contract Derived is Base &#123;
+    function doubleValue&#40;&#41; public view returns &#40;uint256&#41; &#123;
+        return x * 2;  // Can access base state
+    &#125;
+&#125;</code></pre>
+<p><strong>Multiple inheritance:</strong> A contract can inherit from multiple contracts:</p>
+<pre><code class="language-solidity">contract C is A, B &#123;
+    // Inherits from both A and B
+&#125;</code></pre>
+<p>If A and B both define the same function, Solidity uses C3 linearization to determine which is used.</p>
+<hr />
+<h2 id="part_13_interfaces_and_abstract_contracts"><a href="#part_13_interfaces_and_abstract_contracts" class="header-anchor">Part 13: Interfaces and Abstract Contracts</a></h2>
+<h3 id="interface"><a href="#interface" class="header-anchor">Interface</a></h3>
+<p>Specifies a contract&#39;s external API without implementation:</p>
+<pre><code class="language-solidity">interface IERC20 &#123;
+    function transfer&#40;address to, uint256 amount&#41; external returns &#40;bool&#41;;
+    function balanceOf&#40;address owner&#41; external view returns &#40;uint256&#41;;
+&#125;
+
+contract MyToken is IERC20 &#123;
+    // Must implement all functions from IERC20
+    function transfer&#40;address to, uint256 amount&#41; external override returns &#40;bool&#41; &#123;
+        // Implementation
+        return true;
+    &#125;
+    
+    function balanceOf&#40;address owner&#41; external view override returns &#40;uint256&#41; &#123;
+        // Implementation
+        return 0;
+    &#125;
+&#125;</code></pre>
+<h3 id="abstract_contracts"><a href="#abstract_contracts" class="header-anchor">Abstract Contracts</a></h3>
+<p>A contract with some unimplemented functions:</p>
+<pre><code class="language-solidity">abstract contract Base &#123;
+    function mustImplement&#40;&#41; public virtual;  // No implementation
+&#125;
+
+contract Derived is Base &#123;
+    function mustImplement&#40;&#41; public override &#123;
+        // Implementation required
+    &#125;
+&#125;</code></pre>
+<hr />
+<h2 id="part_14_gas_and_execution_model"><a href="#part_14_gas_and_execution_model" class="header-anchor">Part 14: Gas and Execution Model</a></h2>
+<p><strong>Gas</strong> is the EVM&#39;s measure of computational cost. Every operation costs gas:</p>
+<table><tr><th align="right">Operation</th><th align="right">Gas Cost</th></tr><tr><td align="right">Addition/Subtraction</td><td align="right">3</td></tr><tr><td align="right">Multiplication</td><td align="right">5</td></tr><tr><td align="right">Division</td><td align="right">5</td></tr><tr><td align="right">Storage read</td><td align="right">2,100</td></tr><tr><td align="right">Storage write</td><td align="right">20,000</td></tr><tr><td align="right">Memory read/write</td><td align="right">3</td></tr><tr><td align="right">Function call</td><td align="right">700&#43;</td></tr></table>
+<p><strong>Why?</strong> To prevent spam and ensure all nodes can keep up.</p>
+<pre><code class="language-solidity">function expensive&#40;&#41; public &#123;
+    count &#43;&#61; 1;  // Cheap: 3 gas for addition
+    state &#61; 100; // Expensive: 20,000 gas for storage write
+&#125;</code></pre>
+<p><strong>Memory vs. Storage:</strong></p>
+<ul>
+<li><p><strong>Storage</strong> — persistent &#40;costs thousands of gas to write&#41;</p>
+</li>
+<li><p><strong>Memory</strong> — temporary, erased after function call &#40;cheap&#41;</p>
+</li>
+</ul>
+<pre><code class="language-solidity">function process&#40;uint256&#91;&#93; memory data&#41; public &#123;
+    // &#39;memory&#39; keyword: temporary array, cheap
+    for &#40;uint256 i &#61; 0; i &lt; data.length; i&#43;&#43;&#41; &#123;
+        // Process data
+    &#125;
+&#125;</code></pre>
+<hr />
+<h2 id="summary_syntax_as_state_machine_definition"><a href="#summary_syntax_as_state_machine_definition" class="header-anchor">Summary: Syntax as State Machine Definition</a></h2>
+<p>Every piece of Solidity syntax maps to part of the state machine \((\Sigma, s_0, \mathcal{T})\):</p>
+<ul>
+<li><p><strong>State variables</strong> → \(\Sigma\) &#40;the state space&#41;</p>
+</li>
+<li><p><strong>Constructor</strong> → \(s_0\) &#40;initialization&#41;</p>
+</li>
+<li><p><strong>Functions</strong> → parts of \(\mathcal{T}\) &#40;transition rules&#41;</p>
+</li>
+<li><p><strong>Modifiers</strong> → guards on \(\mathcal{T}\) &#40;preconditions&#41;</p>
+</li>
+<li><p><strong>Events</strong> → observable outputs of \(\mathcal{T}\) &#40;logs, not state&#41;</p>
+</li>
+<li><p><strong>Control flow</strong> → internal structure of \(\mathcal{T}\)</p>
+</li>
+<li><p><strong>Types</strong> → domains and codomains of \(\mathcal{T}\)</p>
+</li>
+</ul>
+<p>Once you internalize this, every syntactic construct becomes obvious: it&#39;s machinery for defining deterministic, gas-aware state transitions on a decentralized computer.</p>
+<hr />
+<h2 id="quick_reference_solidity_type_hierarchy"><a href="#quick_reference_solidity_type_hierarchy" class="header-anchor">Quick Reference: Solidity Type Hierarchy</a></h2>
+<pre><code class="language-julia">Value Types &#40;passed by copy&#41;
+├── Primitives
+│   ├── Integers: uint8, ..., uint256, int8, ..., int256
+│   ├── Fixed-point: ufixed128x128 &#40;rare&#41;
+│   ├── Booleans: bool
+│   ├── Bytes: bytes1, ..., bytes32
+│   └── Address: address, address payable
+├── Structs &#40;composite of value types&#41;
+└── Enums &#40;encoded as uint8&#41;
+
+Reference Types &#40;passed by reference&#41;
+├── Arrays
+│   ├── Fixed: T&#91;n&#93;
+│   └── Dynamic: T&#91;&#93;
+├── Mappings: K ↦ V
+├── Strings: string &#40;UTF-8&#41;
+└── Bytes: bytes &#40;dynamic&#41;</code></pre>
+<hr />
+<h2 id="quick_reference_function_signatures"><a href="#quick_reference_function_signatures" class="header-anchor">Quick Reference: Function Signatures</a></h2>
+<pre><code class="language-solidity">// All forms
+function f1&#40;&#41; public &#123; &#125;                           // No params, no return
+function f2&#40;uint x&#41; public returns &#40;uint&#41; &#123; &#125;     // One param, one return
+function f3&#40;uint x, address y&#41; public returns &#40;uint, bool&#41; &#123; &#125;  // Multiple
+
+// Modifiers
+function f&#40;&#41; public onlyOwner nonReentrant &#123; &#125;    // Stacked modifiers
+
+// State access
+function f&#40;&#41; public view &#123; &#125;                       // Read-only
+function f&#40;&#41; public pure &#123; &#125;                       // Deterministic
+function f&#40;&#41; public payable &#123; &#125;                    // Accepts ether
+
+// Special functions
+constructor&#40;&#41; &#123; &#125;                                  // Runs at deployment
+fallback&#40;&#41; external payable &#123; &#125;                   // Unknown function calls
+receive&#40;&#41; external payable &#123; &#125;                    // Plain ether transfers</code></pre>
+<p>That&#39;s it. You now know the complete syntax of Solidity. Everything else is library functions, design patterns, and best practices built on top of these primitives.</p>
+<div class="page-foot">
+    Contact me by <a href="mailto:skchu@wustl.edu">E-mail</a> | <a href="https://github.com/kchu25">Github</a> | <a href="https://www.linkedin.com/in/kchu1/">Linkedin</a>
+    <br>
+    This work is licensed under <a href="http://creativecommons.org/licenses/by-sa/4.0/">CC BY-SA 4.0</a>.  Last modified: March 01, 2026.
+    <br>
+    Website built with <a href="https://github.com/tlienart/Franklin.jl">Franklin.jl</a> and the <a href="https://julialang.org">Julia language</a>.
+</div>
+</div><!-- CONTENT ENDS HERE -->
+    
+        <script src="/libs/katex/katex.min.js"></script>
+<script src="/libs/katex/contrib/auto-render.min.js"></script>
+<script>renderMathInElement(document.body)</script>
+
+    
+    
+        <script src="/libs/highlight/highlight.min.js"></script>
+<script>
+// Register Solidity language for highlight.js
+hljs.registerLanguage('solidity', function(hljs) {
+  return {
+    keywords: {
+      keyword: 'contract interface library pragma import using struct enum event modifier function returns return require revert assert emit new delete if else for while do break continue try catch throw this super constructor fallback receive ' +
+                'public private internal external pure view payable virtual override constant immutable anonymous indexed storage memory calldata',
+      literal: 'true false wei gwei ether seconds minutes hours days weeks years',
+      built_in: 'msg block tx abi now sender value gas data origin gasprice blockhash gasleft address uint int bytes string bool mapping'
+    },
+    contains: [
+      hljs.C_LINE_COMMENT_MODE,
+      hljs.C_BLOCK_COMMENT_MODE,
+      hljs.QUOTE_STRING_MODE,
+      hljs.APOS_STRING_MODE,
+      {
+        className: 'number',
+        begin: '\\b(0[xX][a-fA-F0-9]+|(\\d+(\\.\\d*)?|\\.\\d+)([eE][-+]?\\d+)?)',
+        relevance: 0
+      },
+      {
+        className: 'type',
+        begin: '\\b(uint|int|bytes|byte|string|address|bool|ufixed|fixed)(\\d+x\\d+|\\d+)?\\b'
+      },
+      {
+        className: 'function',
+        beginKeywords: 'function modifier event constructor fallback receive',
+        end: '[{;]',
+        excludeEnd: true,
+        contains: [
+          {
+            className: 'title',
+            begin: '[A-Za-z$_][0-9A-Za-z$_]*',
+            relevance: 0
+          },
+          {
+            className: 'params',
+            begin: '\\(', end: '\\)',
+            contains: [hljs.C_LINE_COMMENT_MODE, hljs.C_BLOCK_COMMENT_MODE]
+          }
+        ]
+      }
+    ]
+  };
+});
+
+hljs.highlightAll();
+hljs.configure({tabReplace: '    '});
+</script>
+
+
+    
+  </body>
+</html>

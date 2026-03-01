@@ -1,0 +1,681 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@700;900&display=swap" rel="stylesheet">
+  <style>
+    @font-face {
+      font-family: 'BPdots';
+      src: url('/blockchains/assets/fonts/BPdots/BPdots.otf') format('opentype');
+      font-weight: normal;
+      font-style: normal;
+    }
+    @font-face {
+      font-family: 'BPdots';
+      src: url('/blockchains/assets/fonts/BPdots/BPdotsBold.otf') format('opentype');
+      font-weight: bold;
+      font-style: normal;
+    }
+  </style>
+   <link rel="stylesheet" href="/libs/katex/katex.min.css">
+     
+   <link rel="stylesheet" href="/libs/highlight/styles/atom-one-dark.min.css">
+   
+  <link rel="stylesheet" href="/css/franklin.css">
+<link rel="stylesheet" href="/css/hypertext.css">
+<link rel="icon" href="/assets/favicon.png">
+
+   <title>Solidity Design Patterns: Architecture Beyond Syntax</title>  
+</head>
+<body>
+<header>
+  <h1 style="color:#283747; font-family:'BPdots', monospace; font-size:2.5em; font-weight:normal; letter-spacing:0.1em">blockchains</h1>
+  <nav>
+    <a href="/" class="current">Tags</a>
+  | <a href="/blog/" >Notes</a>
+  <hr/>
+  </nav>
+</header>
+
+
+<!-- Content appended here -->
+<div class="franklin-content"><h1 id="solidity_design_patterns_architecture_beyond_syntax"><a href="#solidity_design_patterns_architecture_beyond_syntax" class="header-anchor">Solidity Design Patterns: Architecture Beyond Syntax</a></h1>
+<p><strong>TL;DR:</strong> Solidity has a small number of fundamental design patterns that show up everywhere. This post catalogs them: how they work, why they&#39;re necessary, and when to use each one. These patterns address real constraints of the EVM &#40;storage cost, reentrancy, upgrades, access control&#41;. Master these and you&#39;ll recognize the structure of any contract.</p>
+<hr />
+<h2 id="part_1_what_is_a_design_pattern"><a href="#part_1_what_is_a_design_pattern" class="header-anchor">Part 1: What is a Design Pattern?</a></h2>
+<p>A design pattern is a <strong>reusable solution to a recurrent problem</strong> in a specific context. In Solidity, the context is:</p>
+<ul>
+<li><p><strong>Immutability</strong> — deployed code cannot be changed &#40;usually&#41;</p>
+</li>
+<li><p><strong>Expensive storage</strong> — state writes cost 20,000 gas each</p>
+</li>
+<li><p><strong>Single-threaded execution</strong> — transactions are atomic, no concurrent calls</p>
+</li>
+<li><p><strong>No private data</strong> — blockchain is transparent</p>
+</li>
+<li><p><strong>Determinism</strong> — same input always produces same output &#40;or revert&#41;</p>
+</li>
+</ul>
+<p>Given these constraints, certain patterns emerge naturally. There are roughly <strong>7 core patterns</strong> that compose into larger architectures.</p>
+<hr />
+<h2 id="pattern_1_access_control_the_guard"><a href="#pattern_1_access_control_the_guard" class="header-anchor">Pattern 1: Access Control &#40;The Guard&#41;</a></h2>
+<p><strong>Problem:</strong> You want to restrict who can call a function &#40;e.g., only the owner&#41;.</p>
+<p><strong>Solution:</strong> Check <code>msg.sender</code> and revert if unauthorized.</p>
+<pre><code class="language-solidity">contract Owned &#123;
+    address public owner;
+    
+    constructor&#40;&#41; &#123;
+        owner &#61; msg.sender;  // Deployer is owner
+    &#125;
+    
+    modifier onlyOwner&#40;&#41; &#123;
+        require&#40;msg.sender &#61;&#61; owner, &quot;Only owner can call&quot;&#41;;
+        _;
+    &#125;
+    
+    function adminAction&#40;&#41; public onlyOwner &#123;
+        // This function only executes if msg.sender &#61;&#61; owner
+    &#125;
+&#125;</code></pre>
+<p><strong>Formally:</strong> We&#39;re restricting the transition function to a subset of callers:</p>
+\[\mathcal{T}_{\text{restricted}}(s, m) = \begin{cases}
+\mathcal{T}(s, m) & \text{if } \text{authorized}(m) \\
+\bot & \text{otherwise}
+\end{cases}\]
+<p><strong>Why a modifier?</strong> It&#39;s reusable across many functions and keeps code DRY.</p>
+<p><strong>Variations:</strong></p>
+<pre><code class="language-solidity">// Role-based access
+mapping&#40;address &#61;&gt; bool&#41; isAdmin;
+
+modifier onlyAdmin&#40;&#41; &#123;
+    require&#40;isAdmin&#91;msg.sender&#93;, &quot;Not admin&quot;&#41;;
+    _;
+&#125;
+
+// Time-based access
+modifier onlyAfter&#40;uint256 time&#41; &#123;
+    require&#40;block.timestamp &gt;&#61; time, &quot;Too early&quot;&#41;;
+    _;
+&#125;
+
+// Multi-sig &#40;multiple parties required&#41;
+modifier requires2of3&#40;address a, address b, address c&#41; &#123;
+    require&#40;msg.sender &#61;&#61; a || msg.sender &#61;&#61; b || msg.sender &#61;&#61; c&#41;;
+    _;
+&#125;</code></pre>
+<hr />
+<h2 id="pattern_2_state_machine_the_lifecycle"><a href="#pattern_2_state_machine_the_lifecycle" class="header-anchor">Pattern 2: State Machine &#40;The Lifecycle&#41;</a></h2>
+<p><strong>Problem:</strong> A contract should move through distinct states &#40;e.g., &quot;pending&quot; → &quot;active&quot; → &quot;completed&quot;&#41;, and only certain actions are valid in each state.</p>
+<p><strong>Solution:</strong> Encode the state as an enum, and guard functions with modifiers checking the current state.</p>
+<pre><code class="language-solidity">contract Auction &#123;
+    enum State &#123; Pending, Active, Closed &#125;
+    State public state &#61; State.Pending;
+    
+    modifier inState&#40;State s&#41; &#123;
+        require&#40;state &#61;&#61; s, &quot;Invalid state&quot;&#41;;
+        _;
+    &#125;
+    
+    function start&#40;&#41; public inState&#40;State.Pending&#41; &#123;
+        state &#61; State.Active;
+    &#125;
+    
+    function bid&#40;uint256 amount&#41; public inState&#40;State.Active&#41; &#123;
+        // Only works if auction is active
+    &#125;
+    
+    function finalize&#40;&#41; public inState&#40;State.Active&#41; &#123;
+        state &#61; State.Closed;
+    &#125;
+&#125;</code></pre>
+<p><strong>Why?</strong> Prevents calling functions out of order &#40;e.g., bidding in a closed auction&#41;.</p>
+<p><strong>Formally:</strong> Each state \(s \in \mathcal{S}\) &#40;the state space&#41; has a valid set of transitions:</p>
+\[\mathcal{T}_s: \{f \in \mathcal{F} : \text{enabled}(f, s)\} \to \mathcal{S}\]
+<p>The modifier ensures only enabled functions can execute in state \(s\).</p>
+<hr />
+<h2 id="pattern_3_checks-effects-interactions_cei"><a href="#pattern_3_checks-effects-interactions_cei" class="header-anchor">Pattern 3: Checks-Effects-Interactions &#40;CEI&#41;</a></h2>
+<p><strong>Problem:</strong> When you call external contracts, they can re-enter your function and cause bugs &#40;reentrancy&#41;.</p>
+<p><strong>Solution:</strong> Order operations carefully: &#40;1&#41; check preconditions, &#40;2&#41; modify state, &#40;3&#41; call external contracts.</p>
+<pre><code class="language-solidity">// ❌ VULNERABLE &#40;wrong order&#41;
+function withdraw&#40;uint256 amount&#41; public &#123;
+    uint256 balance &#61; balances&#91;msg.sender&#93;;
+    require&#40;balance &gt;&#61; amount&#41;;
+    
+    // ⚠️  Attacker can re-enter here&#33;
+    &#40;bool success, &#41; &#61; msg.sender.call&#123;value: amount&#125;&#40;&quot;&quot;&#41;;
+    require&#40;success&#41;;
+    
+    // This runs AFTER the call, too late
+    balances&#91;msg.sender&#93; -&#61; amount;
+&#125;
+
+// ✅ SAFE &#40;CEI order&#41;
+function withdraw&#40;uint256 amount&#41; public &#123;
+    // 1. Checks
+    uint256 balance &#61; balances&#91;msg.sender&#93;;
+    require&#40;balance &gt;&#61; amount&#41;;
+    
+    // 2. Effects
+    balances&#91;msg.sender&#93; -&#61; amount;  // Update state FIRST
+    
+    // 3. Interactions
+    &#40;bool success, &#41; &#61; msg.sender.call&#123;value: amount&#125;&#40;&quot;&quot;&#41;;
+    require&#40;success&#41;;
+&#125;</code></pre>
+<p><strong>Why?</strong> When you call <code>msg.sender.call&#40;&#41;</code>, the recipient&#39;s fallback function runs. If that function calls <code>withdraw&#40;&#41;</code> again, it sees the <em>updated</em> state &#40;balance already decremented&#41;, so it can&#39;t withdraw twice.</p>
+<p><strong>Formally:</strong> We&#39;re ensuring that external calls see state <em>after</em> the operation:</p>
+\[\text{State}' \leftarrow \text{update}(\text{State}) \quad \text{then} \quad \text{externalCall}(\text{State}')\]
+<p>not:</p>
+\[\text{externalCall}(\text{State}) \quad \text{then} \quad \text{State}' \leftarrow \text{update}(\text{State})\]
+<hr />
+<h2 id="pattern_4_pull_over_push"><a href="#pattern_4_pull_over_push" class="header-anchor">Pattern 4: Pull Over Push</a></h2>
+<p><strong>Problem:</strong> Sending ether to multiple parties is gas-inefficient and error-prone &#40;what if a call fails?&#41;.</p>
+<p><strong>Solution:</strong> Let each party withdraw their own funds &#40;pull pattern&#41; instead of sending &#40;push pattern&#41;.</p>
+<pre><code class="language-solidity">// ❌ Push pattern &#40;inefficient, risky&#41;
+contract Refunder &#123;
+    address&#91;&#93; public refundees;
+    mapping&#40;address &#61;&gt; uint256&#41; amounts;
+    
+    function refundAll&#40;&#41; public &#123;
+        for &#40;uint256 i &#61; 0; i &lt; refundees.length; i&#43;&#43;&#41; &#123;
+            address refundee &#61; refundees&#91;i&#93;;
+            &#40;bool success, &#41; &#61; refundee.call&#123;value: amounts&#91;refundee&#93;&#125;&#40;&quot;&quot;&#41;;
+            if &#40;&#33;success&#41; &#123;
+                // What do we do if one fails? Entire transaction reverts?
+                revert&#40;&quot;Refund failed&quot;&#41;;
+            &#125;
+        &#125;
+    &#125;
+&#125;
+
+// ✅ Pull pattern &#40;efficient, modular&#41;
+contract PullRefunder &#123;
+    mapping&#40;address &#61;&gt; uint256&#41; public refunds;
+    
+    function claim&#40;&#41; public &#123;
+        uint256 amount &#61; refunds&#91;msg.sender&#93;;
+        require&#40;amount &gt; 0&#41;;
+        
+        refunds&#91;msg.sender&#93; &#61; 0;  // Prevent double-claim &#40;CEI order&#41;
+        &#40;bool success, &#41; &#61; msg.sender.call&#123;value: amount&#125;&#40;&quot;&quot;&#41;;
+        require&#40;success&#41;;
+    &#125;
+&#125;</code></pre>
+<p><strong>Why?</strong> </p>
+<ul>
+<li><p>Each party is responsible for their own withdrawal &#40;fault-isolated&#41;</p>
+</li>
+<li><p>No need to iterate over all parties &#40;saves gas, avoids loops&#41;</p>
+</li>
+<li><p>Each call is independent &#40;one failure doesn&#39;t affect others&#41;</p>
+</li>
+</ul>
+<hr />
+<h2 id="pattern_5_tight_variable_packing"><a href="#pattern_5_tight_variable_packing" class="header-anchor">Pattern 5: Tight Variable Packing</a></h2>
+<p><strong>Problem:</strong> Storage is expensive &#40;20,000 gas per write&#41;. If you have many small state variables, you&#39;re wasting space.</p>
+<p><strong>Solution:</strong> Pack multiple small types into a single 256-bit storage slot.</p>
+<pre><code class="language-solidity">// ❌ Inefficient &#40;8 storage slots&#41;
+contract Inefficient &#123;
+    uint64 a;   // Slot 0 &#40;wastes 192 bits&#41;
+    uint64 b;   // Slot 1 &#40;wastes 192 bits&#41;
+    uint64 c;   // Slot 2 &#40;wastes 192 bits&#41;
+    uint64 d;   // Slot 3 &#40;wastes 192 bits&#41;
+&#125;
+
+// ✅ Efficient &#40;1 storage slot&#41;
+contract Efficient &#123;
+    uint64 a;
+    uint64 b;
+    uint64 c;
+    uint64 d;
+    // Packed into slot 0: &#91;d &#40;64 bits&#41; | c &#40;64 bits&#41; | b &#40;64 bits&#41; | a &#40;64 bits&#41;&#93;
+&#125;</code></pre>
+<p><strong>How Solidity packs:</strong> Variables are assigned to storage slots sequentially. Multiple variables fit into one slot &#40;256 bits&#41; if their combined size is ≤ 256 bits.</p>
+<pre><code class="language-solidity">// Careful ordering matters
+contract Optimized &#123;
+    bool flag1;          // Slot 0: 8 bits
+    bool flag2;          // Slot 0: 16 bits total
+    uint64 count;        // Slot 0: 80 bits total
+    address owner;       // Slot 1: 160 bits &#40;doesn&#39;t fit in slot 0&#41;
+    uint256 balance;     // Slot 2: 256 bits
+&#125;</code></pre>
+<p><strong>Gas savings:</strong> Writing to a packed slot costs the same as writing to an unpacked slot &#40;20,000 gas&#41;, but you&#39;re storing 4x more data.</p>
+<hr />
+<h2 id="pattern_6_upgradeability_proxy_pattern"><a href="#pattern_6_upgradeability_proxy_pattern" class="header-anchor">Pattern 6: Upgradeability &#40;Proxy Pattern&#41;</a></h2>
+<p><strong>Problem:</strong> Contracts are immutable. If you deploy buggy code, it&#39;s stuck on the blockchain forever.</p>
+<p><strong>Solution:</strong> Use a proxy: a simple contract that delegates calls to an upgradeable implementation contract.</p>
+<pre><code class="language-solidity">// The implementation contract &#40;can change&#41;
+contract CounterV1 &#123;
+    uint256 public count &#61; 0;
+    
+    function increment&#40;&#41; public &#123;
+        count &#43;&#61; 1;
+    &#125;
+&#125;
+
+// The proxy contract &#40;permanent address&#41;
+contract CounterProxy &#123;
+    address public implementation;
+    address public owner;
+    
+    constructor&#40;address impl&#41; &#123;
+        implementation &#61; impl;
+        owner &#61; msg.sender;
+    &#125;
+    
+    // Delegate all calls to implementation
+    fallback&#40;&#41; external payable &#123;
+        address impl &#61; implementation;
+        assembly &#123;
+            // Copy calldata, delegate call, return
+            let ptr :&#61; mload&#40;0x40&#41;
+            calldatacopy&#40;ptr, 0, calldatasize&#40;&#41;&#41;
+            let result :&#61; delegatecall&#40;gas&#40;&#41;, impl, ptr, calldatasize&#40;&#41;, 0, 0&#41;
+            returndatacopy&#40;ptr, 0, returndatasize&#40;&#41;&#41;
+            switch result
+            case 0 &#123; revert&#40;ptr, returndatasize&#40;&#41;&#41; &#125;
+            default &#123; return&#40;ptr, returndatasize&#40;&#41;&#41; &#125;
+        &#125;
+    &#125;
+    
+    // Upgrade to new implementation
+    function upgrade&#40;address newImpl&#41; public &#123;
+        require&#40;msg.sender &#61;&#61; owner&#41;;
+        implementation &#61; newImpl;
+    &#125;
+&#125;</code></pre>
+<p><strong>How it works:</strong></p>
+<ol>
+<li><p>You deploy <code>CounterProxy</code> with <code>CounterV1</code>&#39;s address</p>
+</li>
+<li><p>Users call <code>CounterProxy</code>, which delegates to <code>CounterV1</code></p>
+</li>
+<li><p>If you find a bug, deploy <code>CounterV2</code> and call <code>upgrade&#40;addressOfCounterV2&#41;</code></p>
+</li>
+<li><p>Users&#39; calls now delegate to <code>CounterV2</code> &#40;same proxy address, new logic&#41;</p>
+</li>
+</ol>
+<p><strong>Trade-off:</strong> Proxy adds complexity and a delegatecall &#40;more gas&#41;, but enables upgrades.</p>
+<p><strong>Formally:</strong> The proxy is a layer of indirection:</p>
+\[\text{call}(\text{proxy}) \to \text{delegatecall}(\text{implementation}) \to \text{result}\]
+<hr />
+<h2 id="pattern_7_allowance_approvals_for_third_parties"><a href="#pattern_7_allowance_approvals_for_third_parties" class="header-anchor">Pattern 7: Allowance &#40;Approvals for Third Parties&#41;</a></h2>
+<p><strong>Problem:</strong> You have a token, and you want to let a third party spend some of your tokens without directly transferring all your authority to them.</p>
+<p><strong>Solution:</strong> Use an allowance mechanism. You approve an amount, and the third party can spend up to that amount.</p>
+<pre><code class="language-solidity">contract ERC20Token &#123;
+    mapping&#40;address &#61;&gt; uint256&#41; public balances;
+    mapping&#40;address &#61;&gt; mapping&#40;address &#61;&gt; uint256&#41;&#41; public allowance;
+    
+    // Transfer directly
+    function transfer&#40;address to, uint256 amount&#41; public &#123;
+        require&#40;balances&#91;msg.sender&#93; &gt;&#61; amount&#41;;
+        balances&#91;msg.sender&#93; -&#61; amount;
+        balances&#91;to&#93; &#43;&#61; amount;
+    &#125;
+    
+    // Approve someone else to spend your tokens
+    function approve&#40;address spender, uint256 amount&#41; public &#123;
+        allowance&#91;msg.sender&#93;&#91;spender&#93; &#61; amount;
+    &#125;
+    
+    // Third party can transfer on your behalf &#40;up to allowance&#41;
+    function transferFrom&#40;address from, address to, uint256 amount&#41; public &#123;
+        require&#40;balances&#91;from&#93; &gt;&#61; amount&#41;;
+        require&#40;allowance&#91;from&#93;&#91;msg.sender&#93; &gt;&#61; amount&#41;;
+        
+        balances&#91;from&#93; -&#61; amount;
+        balances&#91;to&#93; &#43;&#61; amount;
+        allowance&#91;from&#93;&#91;msg.sender&#93; -&#61; amount;  // Deduct from allowance
+    &#125;
+&#125;</code></pre>
+<p><strong>Why?</strong> If a smart contract wants to spend your tokens, you approve it for a specific amount rather than giving it unlimited access.</p>
+<p><strong>Flow:</strong></p>
+<ol>
+<li><p>Alice calls <code>approve&#40;SpenderContract, 100&#41;</code> — permits SpenderContract to spend up to 100 of her tokens</p>
+</li>
+<li><p>SpenderContract calls <code>transferFrom&#40;Alice, Recipient, 50&#41;</code> — transfers 50 of Alice&#39;s tokens</p>
+</li>
+<li><p>Alice&#39;s allowance for SpenderContract is now 50</p>
+</li>
+</ol>
+<p><strong>Formally:</strong> We&#39;re creating a delegation:</p>
+\[\text{allowance}[\text{owner}][\text{spender}] = \text{amount}\]
+<p>and the spender can only transfer up to this amount on behalf of the owner.</p>
+<hr />
+<h2 id="pattern_8_expirydeadline_time_bounds"><a href="#pattern_8_expirydeadline_time_bounds" class="header-anchor">Pattern 8: Expiry/Deadline &#40;Time Bounds&#41;</a></h2>
+<p><strong>Problem:</strong> Users sign transactions that will be executed later. By the time it&#39;s executed, circumstances may have changed &#40;price moved, conditions expired&#41;. You want to let users set a deadline.</p>
+<p><strong>Solution:</strong> Add a <code>deadline</code> parameter. Revert if the function is called after the deadline.</p>
+<pre><code class="language-solidity">contract DEXSwap &#123;
+    function swap&#40;
+        address tokenIn,
+        address tokenOut,
+        uint256 amountIn,
+        uint256 minAmountOut,
+        uint256 deadline  // User specifies deadline
+    &#41; public &#123;
+        require&#40;block.timestamp &lt;&#61; deadline, &quot;Swap expired&quot;&#41;;
+        
+        uint256 amountOut &#61; getSwapAmount&#40;tokenIn, tokenOut, amountIn&#41;;
+        require&#40;amountOut &gt;&#61; minAmountOut, &quot;Slippage too high&quot;&#41;;
+        
+        // Execute swap...
+    &#125;
+&#125;</code></pre>
+<p><strong>Why?</strong> If a user signs a swap, but it sits in the mempool for hours while prices move, they might get a bad price. The deadline ensures it won&#39;t execute if conditions have changed too much.</p>
+<p><strong>Formally:</strong> We&#39;re checking:</p>
+\[\text{block.timestamp} \leq \text{deadline}\]
+<p>If false, the transaction reverts. This is a time-based guard, like the access control pattern.</p>
+<hr />
+<h2 id="pattern_9_nonce_replay_protection"><a href="#pattern_9_nonce_replay_protection" class="header-anchor">Pattern 9: Nonce &#40;Replay Protection&#41;</a></h2>
+<p><strong>Problem:</strong> If you broadcast a signed transaction to the blockchain, an attacker can replay it on a different chain or fork, causing unintended consequences.</p>
+<p><strong>Solution:</strong> Include a nonce &#40;sequential number&#41; in the transaction. Each signature is valid only for that specific nonce.</p>
+<pre><code class="language-solidity">contract PermitToken &#123;
+    mapping&#40;address &#61;&gt; uint256&#41; public nonce;
+    
+    function permit&#40;
+        address owner,
+        address spender,
+        uint256 amount,
+        uint256 deadline,
+        uint8 v,
+        bytes32 r,
+        bytes32 s
+    &#41; public &#123;
+        require&#40;block.timestamp &lt;&#61; deadline&#41;;
+        
+        bytes32 message &#61; keccak256&#40;abi.encode&#40;
+            owner,
+            spender,
+            amount,
+            nonce&#91;owner&#93;&#43;&#43;,  // Include current nonce
+            deadline
+        &#41;&#41;;
+        
+        address recovered &#61; ecrecover&#40;message, v, r, s&#41;;
+        require&#40;recovered &#61;&#61; owner&#41;;
+        
+        // Execute permit...
+    &#125;
+&#125;</code></pre>
+<p><strong>Why?</strong> Once a nonce is used, that signature is no longer valid &#40;even if someone replays it&#41;. The next transaction must use <code>nonce &#43; 1</code>.</p>
+<p><strong>Formally:</strong> Each signature encodes:</p>
+\[\text{signature} = \text{sign}_{\text{private}}(\text{message}(\text{nonce}, \text{data}))\]
+<p>Once a nonce is consumed, that exact signature can never be replayed &#40;different message → different signature required&#41;.</p>
+<hr />
+<h2 id="pattern_10_commit-reveal_privacy"><a href="#pattern_10_commit-reveal_privacy" class="header-anchor">Pattern 10: Commit-Reveal &#40;Privacy&#41;</a></h2>
+<p><strong>Problem:</strong> Blockchain is transparent. If you commit to something &#40;like a bid in an auction&#41;, everyone sees it immediately. You want to hide your action until later.</p>
+<p><strong>Solution:</strong> Split into two phases: &#40;1&#41; commit a hash of your data, &#40;2&#41; reveal the data. The hash was already on-chain, so you can&#39;t change it.</p>
+<pre><code class="language-solidity">contract SecretAuction &#123;
+    mapping&#40;address &#61;&gt; bytes32&#41; commits;
+    mapping&#40;address &#61;&gt; uint256&#41; reveals;
+    
+    // Phase 1: Submit hash of your bid &#40;keccak256&#40;amount, salt&#41;&#41;
+    function commit&#40;bytes32 bidHash&#41; public &#123;
+        commits&#91;msg.sender&#93; &#61; bidHash;
+    &#125;
+    
+    // Phase 2: Reveal your actual bid
+    function reveal&#40;uint256 amount, uint256 salt&#41; public &#123;
+        bytes32 computedHash &#61; keccak256&#40;abi.encode&#40;amount, salt&#41;&#41;;
+        require&#40;computedHash &#61;&#61; commits&#91;msg.sender&#93;, &quot;Invalid reveal&quot;&#41;;
+        
+        // Now auction logic sees your bid
+        reveals&#91;msg.sender&#93; &#61; amount;
+    &#125;
+&#125;</code></pre>
+<p><strong>Why?</strong> No one knew your bid until you revealed it &#40;they only saw the hash&#41;. But you can&#39;t lie about it &#40;hash was committed&#41;.</p>
+<p><strong>Formally:</strong> We&#39;re computing:</p>
+\[\text{commit} = \text{hash}(\text{amount}, \text{salt})\]
+<p>and later verifying:</p>
+\[\text{hash}(\text{reveal}, \text{salt}) = \text{commit}\]
+<p>The hash is cryptographically binding.</p>
+<hr />
+<h2 id="pattern_11_oracle_external_data"><a href="#pattern_11_oracle_external_data" class="header-anchor">Pattern 11: Oracle &#40;External Data&#41;</a></h2>
+<p><strong>Problem:</strong> Smart contracts can&#39;t fetch data from the internet directly. But many contracts need external data &#40;prices, weather, random numbers&#41;.</p>
+<p><strong>Solution:</strong> Use an oracle—a trusted third party that submits data on-chain.</p>
+<pre><code class="language-solidity">contract PriceFeed &#123;
+    address public oracle;
+    uint256 public lastPrice;
+    uint256 public lastUpdate;
+    
+    constructor&#40;address _oracle&#41; &#123;
+        oracle &#61; _oracle;
+    &#125;
+    
+    // Oracle submits price data
+    function setPrice&#40;uint256 price&#41; public &#123;
+        require&#40;msg.sender &#61;&#61; oracle, &quot;Only oracle&quot;&#41;;
+        lastPrice &#61; price;
+        lastUpdate &#61; block.timestamp;
+    &#125;
+    
+    // Contract uses the price
+    function getValue&#40;uint256 tokenAmount&#41; public view returns &#40;uint256&#41; &#123;
+        require&#40;block.timestamp - lastUpdate &lt; 1 day, &quot;Price stale&quot;&#41;;
+        return tokenAmount * lastPrice;
+    &#125;
+&#125;</code></pre>
+<p><strong>Why?</strong> Blockchains are deterministic and isolated &#40;can&#39;t fetch URLs&#41;. Oracles are the bridge to external data.</p>
+<p><strong>Trade-off:</strong> Oracles introduce trust. You&#39;re trusting them to submit accurate data.</p>
+<hr />
+<h2 id="pattern_12_multi-signature_multi-sig"><a href="#pattern_12_multi-signature_multi-sig" class="header-anchor">Pattern 12: Multi-Signature &#40;Multi-Sig&#41;</a></h2>
+<p><strong>Problem:</strong> You want to distribute authority. No single person should be able to drain the contract; multiple approvals required.</p>
+<p><strong>Solution:</strong> Require M-of-N signatures before executing sensitive operations.</p>
+<pre><code class="language-solidity">contract MultiSig &#123;
+    address&#91;&#93; public signers;
+    mapping&#40;bytes32 &#61;&gt; mapping&#40;address &#61;&gt; bool&#41;&#41; public approvals;
+    
+    modifier onlySigners&#40;&#41; &#123;
+        require&#40;isSigner&#40;msg.sender&#41;&#41;;
+        _;
+    &#125;
+    
+    function approve&#40;bytes32 txHash&#41; public onlySigners &#123;
+        approvals&#91;txHash&#93;&#91;msg.sender&#93; &#61; true;
+    &#125;
+    
+    function execute&#40;
+        address target,
+        uint256 value,
+        bytes memory data
+    &#41; public &#123;
+        bytes32 txHash &#61; keccak256&#40;abi.encode&#40;target, value, data&#41;&#41;;
+        
+        // Count approvals
+        uint256 approvalCount &#61; 0;
+        for &#40;uint256 i &#61; 0; i &lt; signers.length; i&#43;&#43;&#41; &#123;
+            if &#40;approvals&#91;txHash&#93;&#91;signers&#91;i&#93;&#93;&#41; &#123;
+                approvalCount&#43;&#43;;
+            &#125;
+        &#125;
+        
+        require&#40;approvalCount &gt;&#61; 2, &quot;Need 2 approvals&quot;&#41;;
+        
+        // Execute
+        &#40;bool success, &#41; &#61; target.call&#123;value: value&#125;&#40;data&#41;;
+        require&#40;success&#41;;
+    &#125;
+&#125;</code></pre>
+<p><strong>Why?</strong> Distributes risk. No single compromised key can steal funds.</p>
+<hr />
+<h2 id="how_these_patterns_compose"><a href="#how_these_patterns_compose" class="header-anchor">How These Patterns Compose</a></h2>
+<p>Real contracts use <strong>multiple patterns together</strong>:</p>
+<pre><code class="language-solidity">contract TokenSale &#123;
+    // Pattern 1: Access Control
+    address public owner;
+    modifier onlyOwner&#40;&#41; &#123; require&#40;msg.sender &#61;&#61; owner&#41;; _; &#125;
+    
+    // Pattern 2: State Machine
+    enum State &#123; Setup, Running, Finalized &#125;
+    State public state &#61; State.Setup;
+    modifier inState&#40;State s&#41; &#123; require&#40;state &#61;&#61; s&#41;; _; &#125;
+    
+    // Pattern 3: Allowance &#40;from ERC20&#41;
+    mapping&#40;address &#61;&gt; uint256&#41; public allowance;
+    
+    // Pattern 4: Time Bounds
+    uint256 public endTime;
+    modifier beforeDeadline&#40;&#41; &#123; require&#40;block.timestamp &lt; endTime&#41;; _; &#125;
+    
+    // Pattern 3: CEI order for withdrawals
+    function withdraw&#40;&#41; public &#123;
+        // Checks
+        require&#40;state &#61;&#61; State.Finalized&#41;;
+        
+        // Effects
+        uint256 amount &#61; myFunds&#91;msg.sender&#93;;
+        myFunds&#91;msg.sender&#93; &#61; 0;
+        
+        // Interactions
+        &#40;bool success, &#41; &#61; msg.sender.call&#123;value: amount&#125;&#40;&quot;&quot;&#41;;
+        require&#40;success&#41;;
+    &#125;
+&#125;</code></pre>
+<hr />
+<h2 id="anti-patterns_to_avoid"><a href="#anti-patterns_to_avoid" class="header-anchor">Anti-Patterns to Avoid</a></h2>
+<h3 id="timestamping_assumptions"><a href="#timestamping_assumptions" class="header-anchor"><ol>
+<li><p>Timestamping Assumptions</p>
+</li>
+</ol>
+</a></h3>
+<p>❌ Bad:</p>
+<pre><code class="language-solidity">require&#40;block.timestamp &#61;&#61; someExactTime&#41;;  // Will never match&#33;</code></pre>
+<p>✅ Good:</p>
+<pre><code class="language-solidity">require&#40;block.timestamp &gt;&#61; startTime &amp;&amp; block.timestamp &lt;&#61; endTime&#41;;</code></pre>
+<p>Blocks are mined at irregular intervals. Use ranges, not exact values.</p>
+<h3 id="ol_start2_delegatecall_to_untrusted_code"><a href="#ol_start2_delegatecall_to_untrusted_code" class="header-anchor"><ol start="2">
+<li><p>Delegatecall to Untrusted Code</p>
+</li>
+</ol>
+</a></h3>
+<p>❌ Bad:</p>
+<pre><code class="language-solidity">address userCode &#61; getUserProvidedAddress&#40;&#41;;
+&#40;bool success, &#41; &#61; userCode.delegatecall&#40;data&#41;;  // Gives full access to your state&#33;</code></pre>
+<p><code>delegatecall</code> runs the code with your contract&#39;s storage. Never delegatecall to untrusted code.</p>
+<h3 id="ol_start3_raw_call_without_checking_return"><a href="#ol_start3_raw_call_without_checking_return" class="header-anchor"><ol start="3">
+<li><p>Raw Call Without Checking Return</p>
+</li>
+</ol>
+</a></h3>
+<p>❌ Bad:</p>
+<pre><code class="language-solidity">msg.sender.call&#123;value: amount&#125;&#40;&quot;&quot;&#41;;  // Ignores return value&#33;</code></pre>
+<p>✅ Good:</p>
+<pre><code class="language-solidity">&#40;bool success, &#41; &#61; msg.sender.call&#123;value: amount&#125;&#40;&quot;&quot;&#41;;
+require&#40;success&#41;;</code></pre>
+<h3 id="ol_start4_using_txorigin_for_authorization"><a href="#ol_start4_using_txorigin_for_authorization" class="header-anchor"><ol start="4">
+<li><p>Using <code>tx.origin</code> for Authorization</p>
+</li>
+</ol>
+</a></h3>
+<p>❌ Bad:</p>
+<pre><code class="language-solidity">require&#40;tx.origin &#61;&#61; owner&#41;;  // Can be spoofed via intermediary contract</code></pre>
+<p>✅ Good:</p>
+<pre><code class="language-solidity">require&#40;msg.sender &#61;&#61; owner&#41;;</code></pre>
+<p><code>tx.origin</code> is the original EOA, not the caller. Use <code>msg.sender</code>.</p>
+<hr />
+<h2 id="summary_the_patterns_at_a_glance"><a href="#summary_the_patterns_at_a_glance" class="header-anchor">Summary: The Patterns at a Glance</a></h2>
+<table><tr><th align="right">Pattern</th><th align="right">Problem</th><th align="right">Solution</th></tr><tr><td align="right"><strong>Access Control</strong></td><td align="right">Who can call this?</td><td align="right">Check <code>msg.sender</code> with modifiers</td></tr><tr><td align="right"><strong>State Machine</strong></td><td align="right">Enforce ordering</td><td align="right">Encode state enum, guard functions</td></tr><tr><td align="right"><strong>CEI</strong></td><td align="right">Reentrancy attacks</td><td align="right">Checks, Effects, Interactions order</td></tr><tr><td align="right"><strong>Pull over Push</strong></td><td align="right">Batch transfer failures</td><td align="right">Let users withdraw their own funds</td></tr><tr><td align="right"><strong>Tight Packing</strong></td><td align="right">Storage cost</td><td align="right">Pack multiple small types in one slot</td></tr><tr><td align="right"><strong>Proxy</strong></td><td align="right">Fix bugs after deploy</td><td align="right">Delegate to upgradeable implementation</td></tr><tr><td align="right"><strong>Allowance</strong></td><td align="right">Third-party spending limits</td><td align="right">Approve then transferFrom</td></tr><tr><td align="right"><strong>Expiry</strong></td><td align="right">Stale data</td><td align="right">Add deadline parameter</td></tr><tr><td align="right"><strong>Nonce</strong></td><td align="right">Replay attacks</td><td align="right">Increment nonce per signature</td></tr><tr><td align="right"><strong>Commit-Reveal</strong></td><td align="right">Hide data until reveal</td><td align="right">Hash first, verify later</td></tr><tr><td align="right"><strong>Oracle</strong></td><td align="right">External data</td><td align="right">Trusted third party submits data</td></tr><tr><td align="right"><strong>Multi-Sig</strong></td><td align="right">Distributed authority</td><td align="right">Require M-of-N approvals</td></tr></table>
+<hr />
+<h2 id="when_to_use_which_pattern"><a href="#when_to_use_which_pattern" class="header-anchor">When to Use Which Pattern</a></h2>
+<p><strong>Building a token?</strong> → Allowance &#43; Transfer &#43; Access Control</p>
+<p><strong>Building an auction?</strong> → State Machine &#43; Commit-Reveal &#43; Deadline</p>
+<p><strong>Building a DEX?</strong> → Pull pattern &#43; Oracles &#43; Expiry &#43; Multi-Sig</p>
+<p><strong>Building a vault?</strong> → Access Control &#43; CEI &#43; Multi-Sig</p>
+<p>These patterns are <strong>composable and reusable</strong>. Most contracts are a combination of 3–5 of them.</p>
+<hr />
+<h2 id="next_understanding_real_contracts"><a href="#next_understanding_real_contracts" class="header-anchor">Next: Understanding Real Contracts</a></h2>
+<p>Now that you know:</p>
+<ol>
+<li><p><strong>Syntax fundamentals</strong> &#40;types, functions, control flow&#41;</p>
+</li>
+<li><p><strong>Design patterns</strong> &#40;access control, state machines, reentrancy guards&#41;</p>
+</li>
+</ol>
+<p>You&#39;re ready to read real contracts &#40;Uniswap, Aave, OpenZeppelin&#41;. Each will be recognizable as a combination of these patterns.</p>
+<p>For example, Uniswap&#39;s core contract uses:</p>
+<ul>
+<li><p>Access Control &#40;owner functions&#41;</p>
+</li>
+<li><p>Allowance &#40;ERC20 approve/transferFrom&#41;</p>
+</li>
+<li><p>CEI &#40;to prevent reentrancy&#41;</p>
+</li>
+<li><p>State Machine &#40;swap states&#41;</p>
+</li>
+<li><p>Multi-Sig &#40;governance&#41;</p>
+</li>
+</ul>
+<p>Recognize the patterns, and the code becomes readable.</p>
+<div class="page-foot">
+    Contact me by <a href="mailto:skchu@wustl.edu">E-mail</a> | <a href="https://github.com/kchu25">Github</a> | <a href="https://www.linkedin.com/in/kchu1/">Linkedin</a>
+    <br>
+    This work is licensed under <a href="http://creativecommons.org/licenses/by-sa/4.0/">CC BY-SA 4.0</a>.  Last modified: March 01, 2026.
+    <br>
+    Website built with <a href="https://github.com/tlienart/Franklin.jl">Franklin.jl</a> and the <a href="https://julialang.org">Julia language</a>.
+</div>
+</div><!-- CONTENT ENDS HERE -->
+    
+        <script src="/libs/katex/katex.min.js"></script>
+<script src="/libs/katex/contrib/auto-render.min.js"></script>
+<script>renderMathInElement(document.body)</script>
+
+    
+    
+        <script src="/libs/highlight/highlight.min.js"></script>
+<script>
+// Register Solidity language for highlight.js
+hljs.registerLanguage('solidity', function(hljs) {
+  return {
+    keywords: {
+      keyword: 'contract interface library pragma import using struct enum event modifier function returns return require revert assert emit new delete if else for while do break continue try catch throw this super constructor fallback receive ' +
+                'public private internal external pure view payable virtual override constant immutable anonymous indexed storage memory calldata',
+      literal: 'true false wei gwei ether seconds minutes hours days weeks years',
+      built_in: 'msg block tx abi now sender value gas data origin gasprice blockhash gasleft address uint int bytes string bool mapping'
+    },
+    contains: [
+      hljs.C_LINE_COMMENT_MODE,
+      hljs.C_BLOCK_COMMENT_MODE,
+      hljs.QUOTE_STRING_MODE,
+      hljs.APOS_STRING_MODE,
+      {
+        className: 'number',
+        begin: '\\b(0[xX][a-fA-F0-9]+|(\\d+(\\.\\d*)?|\\.\\d+)([eE][-+]?\\d+)?)',
+        relevance: 0
+      },
+      {
+        className: 'type',
+        begin: '\\b(uint|int|bytes|byte|string|address|bool|ufixed|fixed)(\\d+x\\d+|\\d+)?\\b'
+      },
+      {
+        className: 'function',
+        beginKeywords: 'function modifier event constructor fallback receive',
+        end: '[{;]',
+        excludeEnd: true,
+        contains: [
+          {
+            className: 'title',
+            begin: '[A-Za-z$_][0-9A-Za-z$_]*',
+            relevance: 0
+          },
+          {
+            className: 'params',
+            begin: '\\(', end: '\\)',
+            contains: [hljs.C_LINE_COMMENT_MODE, hljs.C_BLOCK_COMMENT_MODE]
+          }
+        ]
+      }
+    ]
+  };
+});
+
+hljs.highlightAll();
+hljs.configure({tabReplace: '    '});
+</script>
+
+
+    
+  </body>
+</html>

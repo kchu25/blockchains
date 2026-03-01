@@ -20,6 +20,12 @@
     <priority>0.5</priority>
 </url>
 <url>
+    <loc>https://kchu25.github.io/blog/solidity/design_patterns/index.html</loc>
+    <lastmod>2026-03-01</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.5</priority>
+</url>
+<url>
     <loc>https://kchu25.github.io/blog/solidity/lending_app/index.html</loc>
     <lastmod>2026-02-21</lastmod>
     <changefreq>monthly</changefreq>
@@ -142,6 +148,12 @@
 <url>
     <loc>https://kchu25.github.io/blog/solidity/roadmap/index.html</loc>
     <lastmod>2026-02-21</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.5</priority>
+</url>
+<url>
+    <loc>https://kchu25.github.io/blog/solidity/syntax_fundamentals/index.html</loc>
+    <lastmod>2026-03-01</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.5</priority>
 </url>
