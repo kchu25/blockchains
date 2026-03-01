@@ -1,0 +1,449 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@700;900&display=swap" rel="stylesheet">
+  <style>
+    @font-face {
+      font-family: 'BPdots';
+      src: url('/blockchains/assets/fonts/BPdots/BPdots.otf') format('opentype');
+      font-weight: normal;
+      font-style: normal;
+    }
+    @font-face {
+      font-family: 'BPdots';
+      src: url('/blockchains/assets/fonts/BPdots/BPdotsBold.otf') format('opentype');
+      font-weight: bold;
+      font-style: normal;
+    }
+  </style>
+   <link rel="stylesheet" href="/libs/katex/katex.min.css">
+     
+   <link rel="stylesheet" href="/libs/highlight/styles/atom-one-dark.min.css">
+   
+  <link rel="stylesheet" href="/css/franklin.css">
+<link rel="stylesheet" href="/css/hypertext.css">
+<link rel="icon" href="/assets/favicon.png">
+
+   <title>Thinking About Smart Contracts: A Discrete Math Mental Model</title>  
+</head>
+<body>
+<header>
+  <h1 style="color:#283747; font-family:'BPdots', monospace; font-size:2.5em; font-weight:normal; letter-spacing:0.1em">blockchains</h1>
+  <nav>
+    <a href="/" class="current">Tags</a>
+  | <a href="/blog/" >Notes</a>
+  <hr/>
+  </nav>
+</header>
+
+
+<!-- Content appended here -->
+<div class="franklin-content"><h1 id="thinking_about_smart_contracts_a_discrete_math_mental_model"><a href="#thinking_about_smart_contracts_a_discrete_math_mental_model" class="header-anchor">Thinking About Smart Contracts: A Discrete Math Mental Model</a></h1>
+<blockquote>
+<p><strong>The problem:</strong> Thinking in Solidity is slow. You get bogged down in <code>mapping</code>, <code>require</code>, <code>msg.sender</code>, gas, and lose sight of the <em>problem</em> you&#39;re solving. This post gives you a formal framework — rooted in discrete math — to reason about smart contracts <em>before</em> writing a single line of code. Design the system on paper, then translate to Solidity mechanically.</p>
+</blockquote>
+<hr />
+<h2 id="the_core_object_a_guarded_transition_system"><a href="#the_core_object_a_guarded_transition_system" class="header-anchor">The Core Object: A Guarded Transition System</a></h2>
+<p>Every smart contract is a <strong>guarded transition system</strong>. Forget Solidity for a moment. Here&#39;s the mathematical object:</p>
+\[\mathcal{C} = (S, s_0, A, G, \delta, O)\]
+<p>where:</p>
+<table><tr><th align="right">Symbol</th><th align="right">Name</th><th align="right">What it is</th></tr><tr><td align="right">\(S\)</td><td align="right">State space</td><td align="right">All possible configurations of the contract</td></tr><tr><td align="right">\(s_0 \in S\)</td><td align="right">Initial state</td><td align="right">Configuration at deployment</td></tr><tr><td align="right">\(A\)</td><td align="right">Action set</td><td align="right">All possible calls &#40;function name &#43; arguments &#43; caller&#41;</td></tr><tr><td align="right">\(G: S \times A \to \{\text{true}, \text{false}\}\)</td><td align="right">Guard predicates</td><td align="right">Conditions that must hold for an action to be allowed</td></tr><tr><td align="right">\(\delta: S \times A \rightharpoonup S\)</td><td align="right">Transition function</td><td align="right">How the state changes &#40;partial: undefined when guard fails&#41;</td></tr><tr><td align="right">\(O: S \times A \to \mathcal{E}^*\)</td><td align="right">Output function</td><td align="right">Events emitted &#40;observable side effects&#41;</td></tr></table>
+<p><strong>That&#39;s it.</strong> Every smart contract ever written is an instantiation of this tuple. The Solidity syntax is just notation for specifying each component.</p>
+<hr />
+<h2 id="component_1_state_space_s"><a href="#component_1_state_space_s" class="header-anchor">Component 1: State Space \(S\)</a></h2>
+<p>The state space is the <strong>Cartesian product</strong> of all your state variables:</p>
+\[S = D_1 \times D_2 \times \cdots \times D_n\]
+<p>where each \(D_i\) is the domain of a state variable.</p>
+<h3 id="example_token_contract"><a href="#example_token_contract" class="header-anchor">Example: Token Contract</a></h3>
+<p>A token has:</p>
+<ul>
+<li><p>Balances: who owns how much</p>
+</li>
+<li><p>Total supply: how many tokens exist</p>
+</li>
+<li><p>Allowances: who is authorized to spend on whose behalf</p>
+</li>
+</ul>
+\[S = \underbrace{(\text{Addr} \to \mathbb{N})}_{\text{balances}} \times \underbrace{\mathbb{N}}_{\text{totalSupply}} \times \underbrace{(\text{Addr} \times \text{Addr} \to \mathbb{N})}_{\text{allowances}}\]
+<p>A specific state is a point in this space:</p>
+\[s = (\text{bal}, \text{supply}, \text{allow})\]
+<p>where \(\text{bal}: \text{Addr} \to \mathbb{N}\) is the balance function, etc.</p>
+<blockquote>
+<p><strong>Key insight:</strong> Before writing any code, enumerate your state variables and their domains. The state space is the product. This is your &quot;database schema.&quot;</p>
+</blockquote>
+<h3 id="example_auction_contract"><a href="#example_auction_contract" class="header-anchor">Example: Auction Contract</a></h3>
+\[S = \underbrace{\text{Addr}}_{\text{highestBidder}} \times \underbrace{\mathbb{N}}_{\text{highestBid}} \times \underbrace{(\text{Addr} \to \mathbb{N})}_{\text{pendingReturns}} \times \underbrace{\{\text{Open}, \text{Closed}\}}_{\text{phase}} \times \underbrace{\mathbb{N}}_{\text{endTime}}\]
+<p>Note: the phase variable is a <strong>finite set</strong> &#40;an enum&#41;. This makes the contract a <em>finite state machine</em> in that dimension, while infinite in the others &#40;balances can be any natural number&#41;.</p>
+<hr />
+<h2 id="component_2_action_set_a"><a href="#component_2_action_set_a" class="header-anchor">Component 2: Action Set \(A\)</a></h2>
+<p>An action is a <strong>function call with context</strong>. Formally:</p>
+\[a = (f, \vec{x}, c, v, t) \in A\]
+<p>where:</p>
+<ul>
+<li><p>\(f\) &#61; function name</p>
+</li>
+<li><p>\(\vec{x}\) &#61; arguments</p>
+</li>
+<li><p>\(c \in \text{Addr}\) &#61; caller &#40;<code>msg.sender</code>&#41;</p>
+</li>
+<li><p>\(v \in \mathbb{N}\) &#61; value sent &#40;<code>msg.value</code>&#41;</p>
+</li>
+<li><p>\(t \in \mathbb{N}\) &#61; timestamp &#40;<code>block.timestamp</code>&#41;</p>
+</li>
+</ul>
+<p>In Solidity, you write <code>function f&#40;uint x, address y&#41; public payable</code>. In math, you define the action:</p>
+\[a_f = (f, (x, y), c, v, t)\]
+<blockquote>
+<p><strong>Why model the caller as part of the action?</strong> Because in smart contracts, <em>who</em> calls a function is as important as <em>what</em> they call it with. The same function called by the owner vs. a random user may have completely different behavior.</p>
+</blockquote>
+<h3 id="enumerate_your_actions"><a href="#enumerate_your_actions" class="header-anchor">Enumerate Your Actions</a></h3>
+<p>For a token contract:</p>
+\[A = \{ \text{transfer}(to, amt, c), \text{approve}(spender, amt, c), \text{transferFrom}(from, to, amt, c), \text{mint}(to, amt, c) \}\]
+<p>Each action is a distinct input to the system. List them all before writing code.</p>
+<hr />
+<h2 id="component_3_guard_predicates_g"><a href="#component_3_guard_predicates_g" class="header-anchor">Component 3: Guard Predicates \(G\)</a></h2>
+<p>This is where smart contracts get interesting. A guard is a <strong>precondition</strong> that must be satisfied for an action to execute:</p>
+\[G(s, a) = \begin{cases} \text{true} & \text{action is allowed in state } s \\ \text{false} & \text{action reverts} \end{cases}\]
+<p>Guards encode your <strong>business rules</strong>, <strong>access control</strong>, and <strong>safety constraints</strong>.</p>
+<h3 id="example_token_transfer_guards"><a href="#example_token_transfer_guards" class="header-anchor">Example: Token Transfer Guards</a></h3>
+<p>For \(a = \text{transfer}(to, amt, c)\) in state \(s = (\text{bal}, \text{supply}, \text{allow})\):</p>
+\[G(s, a) = \underbrace{(\text{bal}(c) \geq amt)}_{\text{sufficient balance}} \wedge \underbrace{(to \neq \mathbf{0})}_{\text{valid recipient}} \wedge \underbrace{(amt > 0)}_{\text{positive amount}}\]
+<p>Each conjunct is a <code>require</code> statement in Solidity:</p>
+<pre><code class="language-solidity">require&#40;balances&#91;msg.sender&#93; &gt;&#61; amount, &quot;Insufficient balance&quot;&#41;;
+require&#40;to &#33;&#61; address&#40;0&#41;, &quot;Invalid recipient&quot;&#41;;
+require&#40;amount &gt; 0, &quot;Amount must be positive&quot;&#41;;</code></pre>
+<h3 id="example_auction_bid_guards"><a href="#example_auction_bid_guards" class="header-anchor">Example: Auction Bid Guards</a></h3>
+<p>For \(a = \text{bid}(c, v, t)\):</p>
+\[G(s, a) = \underbrace{(s.\text{phase} = \text{Open})}_{\text{auction is active}} \wedge \underbrace{(t < s.\text{endTime})}_{\text{not expired}} \wedge \underbrace{(v > s.\text{highestBid})}_{\text{outbids current}}\]
+<h3 id="guard_composition"><a href="#guard_composition" class="header-anchor">Guard Composition</a></h3>
+<p>Guards compose naturally with logical connectives:</p>
+\[G_{\text{combined}} = G_1 \wedge G_2 \wedge G_3\]
+<p>This is why Solidity modifiers stack:</p>
+<pre><code class="language-solidity">function bid&#40;&#41; public payable onlyDuring&#40;Phase.Open&#41; beforeDeadline &#123;
+    require&#40;msg.value &gt; highestBid, &quot;Bid too low&quot;&#41;;
+&#125;</code></pre>
+<p>Each modifier is one conjunct. The <code>require</code> in the body is another. The full guard is their conjunction.</p>
+<blockquote>
+<p><strong>Design principle:</strong> Write out your guard predicates as logical formulas first. Each conjunct becomes a <code>require</code> or modifier. If you can&#39;t express a guard formally, you don&#39;t understand your business rule well enough.</p>
+</blockquote>
+<hr />
+<h2 id="component_4_transition_function_delta"><a href="#component_4_transition_function_delta" class="header-anchor">Component 4: Transition Function \(\delta\)</a></h2>
+<p>The transition function defines how state changes:</p>
+\[\delta(s, a) = s' \quad \text{(new state)}\]
+<p>It&#39;s a <strong>partial function</strong> — defined only when \(G(s, a) = \text{true}\).</p>
+<h3 id="example_token_transfer"><a href="#example_token_transfer" class="header-anchor">Example: Token Transfer</a></h3>
+<p>For \(a = \text{transfer}(to, amt, c)\):</p>
+\[\delta(s, a) = s' \text{ where } \begin{cases} s'.\text{bal}(c) = s.\text{bal}(c) - amt \\ s'.\text{bal}(to) = s.\text{bal}(to) + amt \\ s'.\text{supply} = s.\text{supply} & \text{(unchanged)} \\ s'.\text{allow} = s.\text{allow} & \text{(unchanged)} \end{cases}\]
+<p>In Solidity:</p>
+<pre><code class="language-solidity">balances&#91;msg.sender&#93; -&#61; amount;
+balances&#91;to&#93; &#43;&#61; amount;</code></pre>
+<h3 id="key_property_conservation_laws"><a href="#key_property_conservation_laws" class="header-anchor">Key Property: Conservation Laws</a></h3>
+<p>Notice that in the transfer above:</p>
+\[s'.\text{bal}(c) + s'.\text{bal}(to) = s.\text{bal}(c) + s.\text{bal}(to)\]
+<p>Total tokens are <strong>conserved</strong>. This is an <em>invariant</em> — a property that holds across all transitions. You should identify invariants before writing code:</p>
+\[\forall s, a: G(s,a) \implies I(\delta(s,a))\]
+<p>&quot;For every state and action, if the guard passes, the invariant still holds after the transition.&quot;</p>
+<h3 id="example_invariants"><a href="#example_invariants" class="header-anchor">Example Invariants</a></h3>
+<table><tr><th align="right">Contract</th><th align="right">Invariant</th></tr><tr><td align="right">Token</td><td align="right">\(\sum_a \text{bal}(a) = \text{totalSupply}\)</td></tr><tr><td align="right">Auction</td><td align="right">\(\text{highestBid} \leq \text{address(this).balance}\)</td></tr><tr><td align="right">Escrow</td><td align="right">\(\text{balance} = \text{buyerDeposit} + \text{sellerDeposit}\)</td></tr><tr><td align="right">Voting</td><td align="right">\(\sum_p \text{votes}(p) \leq \text{totalVoters}\)</td></tr></table>
+<p><strong>If you can&#39;t state your invariants, you have a bug waiting to happen.</strong></p>
+<hr />
+<h2 id="component_5_state_diagram"><a href="#component_5_state_diagram" class="header-anchor">Component 5: State Diagram</a></h2>
+<p>Now comes the visual tool. For contracts with a <strong>finite phase variable</strong> &#40;enum&#41;, draw the state diagram:</p>
+<pre><code class="language-julia">bid&#40;&#41;
+    ┌──────────────────────┐
+    │                      │
+    ▼                      │
+┌─────────┐  endAuction&#40;&#41; ┌─────────┐  withdraw&#40;&#41;  ┌───────────┐
+│  Open   │──────────────→│ Closed  │─────────────→│ Finalized │
+└─────────┘               └─────────┘              └───────────┘
+     │                         │
+     │ cancel&#40;&#41;                │ &#40;no more transitions&#41;
+     ▼                         │
+┌──────────┐                   │
+│ Canceled │←──────────────────┘
+└──────────┘    &#40;if no bids&#41;</code></pre>
+<p>Each node is a <strong>phase</strong> &#40;value of the enum&#41;. Each edge is an <strong>action</strong> that transitions between phases. The guard predicates determine which edges are enabled.</p>
+<h3 id="drawing_the_diagram_a_procedure"><a href="#drawing_the_diagram_a_procedure" class="header-anchor">Drawing the Diagram: A Procedure</a></h3>
+<ol>
+<li><p><strong>List your phases</strong> &#40;the finite part of \(S\)&#41;. These become nodes.</p>
+</li>
+<li><p><strong>List your actions</strong> &#40;\(A\)&#41;. These become candidate edges.</p>
+</li>
+<li><p><strong>For each action, ask:</strong> &quot;Which phase must I be in?&quot; and &quot;Which phase do I end up in?&quot; Draw the edge.</p>
+</li>
+<li><p><strong>Label each edge</strong> with its guard predicates.</p>
+</li>
+<li><p><strong>Identify absorbing states</strong> — states with no outgoing edges &#40;e.g., &quot;Finalized&quot;&#41;.</p>
+</li>
+</ol>
+<p>This is a <strong>labeled transition system</strong> &#40;LTS&#41; in formal methods terminology.</p>
+<h3 id="when_theres_no_enum"><a href="#when_theres_no_enum" class="header-anchor">When There&#39;s No Enum</a></h3>
+<p>Some contracts &#40;e.g., a simple token&#41; don&#39;t have an explicit phase variable. The &quot;state diagram&quot; collapses to a single node with self-loops:</p>
+<pre><code class="language-julia">transfer&#40;&#41;
+    ┌──────────────────┐
+    │                  │
+    ▼                  │
+┌────────────┐  approve&#40;&#41;  
+│  Active    │──────────┘
+│ &#40;only      │
+│  phase&#41;    │──── mint&#40;&#41;
+└────────────┘</code></pre>
+<p>Here the interesting structure is in the <strong>guard predicates</strong> and <strong>invariants</strong>, not the phase transitions.</p>
+<blockquote>
+<p><strong>Rule of thumb:</strong> If your contract has 2&#43; phases, draw the state diagram. If it has 1 phase, focus on invariants.</p>
+</blockquote>
+<hr />
+<h2 id="component_6_roles_and_permissions_a_relation"><a href="#component_6_roles_and_permissions_a_relation" class="header-anchor">Component 6: Roles and Permissions — A Relation</a></h2>
+<p>Access control is a <strong>relation</strong> between addresses and actions:</p>
+\[R \subseteq \text{Addr} \times A\]
+<p>\((c, a) \in R\) means &quot;caller \(c\) is authorized to perform action \(a\).&quot;</p>
+<p>In practice, you define <strong>roles</strong> as equivalence classes:</p>
+\[\text{Roles} = \{\text{Owner}, \text{Admin}, \text{Minter}, \text{User}, \ldots\}\]
+<p>And a role assignment function:</p>
+\[\rho: \text{Addr} \to \mathcal{P}(\text{Roles})\]
+<p>&#40;Each address maps to a <em>set</em> of roles it holds.&#41;</p>
+<p>Then guards include role checks:</p>
+\[G(s, a) = \cdots \wedge (\text{role} \in \rho(c))\]
+<h3 id="permission_matrix"><a href="#permission_matrix" class="header-anchor">Permission Matrix</a></h3>
+<p>Draw this before writing modifiers:</p>
+<table><tr><th align="right">Action</th><th align="right">Owner</th><th align="right">Admin</th><th align="right">Minter</th><th align="right">Anyone</th></tr><tr><td align="right"><code>mint</code></td><td align="right">✓</td><td align="right">✓</td><td align="right">✓</td><td align="right">✗</td></tr><tr><td align="right"><code>burn</code></td><td align="right">✓</td><td align="right">✓</td><td align="right">✗</td><td align="right">✗</td></tr><tr><td align="right"><code>pause</code></td><td align="right">✓</td><td align="right">✗</td><td align="right">✗</td><td align="right">✗</td></tr><tr><td align="right"><code>transfer</code></td><td align="right">✓</td><td align="right">✓</td><td align="right">✓</td><td align="right">✓</td></tr><tr><td align="right"><code>grantRole</code></td><td align="right">✓</td><td align="right">✗</td><td align="right">✗</td><td align="right">✗</td></tr></table>
+<p>Each row becomes a function. Each &quot;✓&quot; column becomes a guard conjunct. This table <em>is</em> your access control design.</p>
+<hr />
+<h2 id="putting_it_all_together_the_design_procedure"><a href="#putting_it_all_together_the_design_procedure" class="header-anchor">Putting It All Together: The Design Procedure</a></h2>
+<p>Before writing any Solidity:</p>
+<h3 id="step_1_define_s_state_space"><a href="#step_1_define_s_state_space" class="header-anchor">Step 1: Define \(S\) &#40;State Space&#41;</a></h3>
+<p>List every piece of data your contract needs to remember.</p>
+\[S = D_1 \times D_2 \times \cdots \times D_n\]
+<p>Ask: <em>What does the contract need to know between calls?</em></p>
+<h3 id="step_2_define_s_0_initial_state"><a href="#step_2_define_s_0_initial_state" class="header-anchor">Step 2: Define \(s_0\) &#40;Initial State&#41;</a></h3>
+<p>What are the initial values? Who is the deployer? What&#39;s the starting phase?</p>
+<h3 id="step_3_define_a_actions"><a href="#step_3_define_a_actions" class="header-anchor">Step 3: Define \(A\) &#40;Actions&#41;</a></h3>
+<p>List every operation a user can perform. Include the caller as part of the action.</p>
+<h3 id="step_4_define_g_guards"><a href="#step_4_define_g_guards" class="header-anchor">Step 4: Define \(G\) &#40;Guards&#41;</a></h3>
+<p>For each action, write the preconditions as a logical formula.</p>
+\[G(s, a) = \phi_1 \wedge \phi_2 \wedge \cdots \wedge \phi_k\]
+<h3 id="step_5_define_delta_transitions"><a href="#step_5_define_delta_transitions" class="header-anchor">Step 5: Define \(\delta\) &#40;Transitions&#41;</a></h3>
+<p>For each action, specify how each state variable changes &#40;or stays the same&#41;.</p>
+<h3 id="step_6_state_invariants"><a href="#step_6_state_invariants" class="header-anchor">Step 6: State Invariants</a></h3>
+<p>What properties must <em>always</em> hold?</p>
+\[\forall s \in \text{Reachable}(s_0): I(s) = \text{true}\]
+<h3 id="step_7_draw_the_state_diagram"><a href="#step_7_draw_the_state_diagram" class="header-anchor">Step 7: Draw the State Diagram</a></h3>
+<p>If you have phases, draw the LTS. Label edges with actions and guards.</p>
+<h3 id="step_8_permission_matrix"><a href="#step_8_permission_matrix" class="header-anchor">Step 8: Permission Matrix</a></h3>
+<p>Who can do what? Draw the role × action table.</p>
+<h3 id="step_9_translate_to_solidity"><a href="#step_9_translate_to_solidity" class="header-anchor">Step 9: Translate to Solidity</a></h3>
+<p>Now — and only now — open your editor.</p>
+<table><tr><th align="right">Math</th><th align="right">Solidity</th></tr><tr><td align="right">\(S = D_1 \times \cdots \times D_n\)</td><td align="right">State variables &#40;<code>uint256</code>, <code>mapping</code>, <code>enum</code>, ...&#41;</td></tr><tr><td align="right">\(s_0\)</td><td align="right">Constructor</td></tr><tr><td align="right">\(A\)</td><td align="right">Functions</td></tr><tr><td align="right">\(G(s, a) = \phi_1 \wedge \cdots\)</td><td align="right"><code>require&#40;...&#41;</code> &#43; modifiers</td></tr><tr><td align="right">\(\delta(s, a) = s'\)</td><td align="right">Function body &#40;state mutations&#41;</td></tr><tr><td align="right">\(I(s)\)</td><td align="right"><code>assert&#40;...&#41;</code> &#40;invariant checks&#41;</td></tr><tr><td align="right">\(O(s, a)\)</td><td align="right"><code>emit Event&#40;...&#41;</code></td></tr><tr><td align="right">\(\rho(c)\)</td><td align="right"><code>mapping&#40;address &#61;&gt; Role&#41;</code> &#43; <code>onlyRole</code> modifiers</td></tr><tr><td align="right">Phase enum</td><td align="right"><code>enum Phase &#123; ... &#125;</code></td></tr><tr><td align="right">State diagram edges</td><td align="right">Functions with <code>require&#40;phase &#61;&#61; ...&#41;</code> guards</td></tr></table>
+<hr />
+<h2 id="worked_example_crowdfunding_contract"><a href="#worked_example_crowdfunding_contract" class="header-anchor">Worked Example: Crowdfunding Contract</a></h2>
+<p>Let&#39;s design a crowdfunding contract — purely in math, then translate.</p>
+<h3 id="step_1_state_space"><a href="#step_1_state_space" class="header-anchor">Step 1: State Space</a></h3>
+\[S = \underbrace{(\text{Addr} \to \mathbb{N})}_{\text{pledges}} \times \underbrace{\mathbb{N}}_{\text{goal}} \times \underbrace{\mathbb{N}}_{\text{deadline}} \times \underbrace{\text{Addr}}_{\text{creator}} \times \underbrace{\{\text{Funding}, \text{Succeeded}, \text{Failed}\}}_{\text{phase}} \times \underbrace{\mathbb{N}}_{\text{totalPledged}}\]
+<h3 id="step_2_initial_state"><a href="#step_2_initial_state" class="header-anchor">Step 2: Initial State</a></h3>
+\[s_0 = (\lambda a.\, 0,\; \text{goal},\; \text{now} + \text{duration},\; \text{deployer},\; \text{Funding},\; 0)\]
+<h3 id="step_3_actions"><a href="#step_3_actions" class="header-anchor">Step 3: Actions</a></h3>
+\[A = \{\text{pledge}(c, v, t), \;\text{claim}(c, t), \;\text{refund}(c, t), \;\text{cancel}(c)\}\]
+<h3 id="step_4_guards"><a href="#step_4_guards" class="header-anchor">Step 4: Guards</a></h3>
+<p><strong>pledge:</strong></p>
+\[G_{\text{pledge}} = (s.\text{phase} = \text{Funding}) \wedge (t < s.\text{deadline}) \wedge (v > 0)\]
+<p><strong>claim</strong> &#40;creator withdraws if goal met&#41;:</p>
+\[G_{\text{claim}} = (c = s.\text{creator}) \wedge (s.\text{phase} = \text{Succeeded})\]
+<p><strong>refund</strong> &#40;pledger gets money back if failed&#41;:</p>
+\[G_{\text{refund}} = (s.\text{phase} = \text{Failed}) \wedge (s.\text{pledges}(c) > 0)\]
+<p><strong>finalize</strong> &#40;anyone can trigger phase change after deadline&#41;:</p>
+\[G_{\text{finalize}} = (s.\text{phase} = \text{Funding}) \wedge (t \geq s.\text{deadline})\]
+\[\delta_{\text{finalize}}.\text{phase} = \begin{cases} \text{Succeeded} & \text{if } s.\text{totalPledged} \geq s.\text{goal} \\ \text{Failed} & \text{otherwise} \end{cases}\]
+<h3 id="step_5_transitions"><a href="#step_5_transitions" class="header-anchor">Step 5: Transitions</a></h3>
+<p><strong>pledge:</strong></p>
+\[\delta: \quad s'.\text{pledges}(c) = s.\text{pledges}(c) + v, \quad s'.\text{totalPledged} = s.\text{totalPledged} + v\]
+<p><strong>claim:</strong></p>
+\[\delta: \quad \text{transfer } s.\text{totalPledged} \text{ to } s.\text{creator}\]
+<p><strong>refund:</strong></p>
+\[\delta: \quad \text{transfer } s.\text{pledges}(c) \text{ to } c, \quad s'.\text{pledges}(c) = 0\]
+<h3 id="step_6_invariants"><a href="#step_6_invariants" class="header-anchor">Step 6: Invariants</a></h3>
+\[I_1: \quad s.\text{totalPledged} = \sum_a s.\text{pledges}(a)\]
+\[I_2: \quad s.\text{phase} = \text{Succeeded} \implies s.\text{totalPledged} \geq s.\text{goal}\]
+\[I_3: \quad s.\text{phase} = \text{Funding} \implies \text{no funds have been withdrawn}\]
+<h3 id="step_7_state_diagram"><a href="#step_7_state_diagram" class="header-anchor">Step 7: State Diagram</a></h3>
+<pre><code class="language-julia">pledge&#40;&#41;                 finalize&#40;&#41;
+          ┌───────────────┐      &#91;total ≥ goal&#93;
+          │               │     ┌──────────────┐
+          ▼               │     ▼              │
+     ┌──────────┐    finalize&#40;&#41;    ┌────────────┐  claim&#40;&#41;  ┌─────────┐
+     │ Funding  │─────────────────→│ Succeeded  │─────────→│ Claimed │
+     └──────────┘                  └────────────┘          └─────────┘
+          │
+          │ finalize&#40;&#41;
+          │ &#91;total &lt; goal&#93;
+          ▼
+     ┌──────────┐  refund&#40;&#41;  ┌──────────┐
+     │  Failed  │───────────→│  Failed  │ &#40;self-loop: each pledger refunds&#41;
+     └──────────┘            └──────────┘</code></pre>
+<h3 id="step_8_permission_matrix__2"><a href="#step_8_permission_matrix__2" class="header-anchor">Step 8: Permission Matrix</a></h3>
+<table><tr><th align="right">Action</th><th align="right">Creator</th><th align="right">Pledger</th><th align="right">Anyone</th></tr><tr><td align="right"><code>pledge</code></td><td align="right">✓</td><td align="right">✓</td><td align="right">✓</td></tr><tr><td align="right"><code>finalize</code></td><td align="right">✓</td><td align="right">✓</td><td align="right">✓</td></tr><tr><td align="right"><code>claim</code></td><td align="right">✓</td><td align="right">✗</td><td align="right">✗</td></tr><tr><td align="right"><code>refund</code></td><td align="right">✗</td><td align="right">✓ &#40;self only&#41;</td><td align="right">✗</td></tr></table>
+<h3 id="step_9_translate"><a href="#step_9_translate" class="header-anchor">Step 9: Translate</a></h3>
+<pre><code class="language-solidity">// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.24;
+
+contract Crowdfund &#123;
+    // S &#61; pledges × goal × deadline × creator × phase × totalPledged
+    enum Phase &#123; Funding, Succeeded, Failed &#125;
+
+    mapping&#40;address &#61;&gt; uint256&#41; public pledges;
+    uint256 public goal;
+    uint256 public deadline;
+    address public creator;
+    Phase public phase;
+    uint256 public totalPledged;
+
+    // s₀
+    constructor&#40;uint256 _goal, uint256 _duration&#41; &#123;
+        goal &#61; _goal;
+        deadline &#61; block.timestamp &#43; _duration;
+        creator &#61; msg.sender;
+        phase &#61; Phase.Funding;
+    &#125;
+
+    // G_pledge ∧ δ_pledge
+    function pledge&#40;&#41; external payable &#123;
+        require&#40;phase &#61;&#61; Phase.Funding, &quot;Not funding&quot;&#41;;
+        require&#40;block.timestamp &lt; deadline, &quot;Deadline passed&quot;&#41;;
+        require&#40;msg.value &gt; 0, &quot;Must send ETH&quot;&#41;;
+
+        pledges&#91;msg.sender&#93; &#43;&#61; msg.value;
+        totalPledged &#43;&#61; msg.value;
+    &#125;
+
+    // G_finalize ∧ δ_finalize
+    function finalize&#40;&#41; external &#123;
+        require&#40;phase &#61;&#61; Phase.Funding, &quot;Already finalized&quot;&#41;;
+        require&#40;block.timestamp &gt;&#61; deadline, &quot;Too early&quot;&#41;;
+
+        if &#40;totalPledged &gt;&#61; goal&#41; &#123;
+            phase &#61; Phase.Succeeded;
+        &#125; else &#123;
+            phase &#61; Phase.Failed;
+        &#125;
+    &#125;
+
+    // G_claim ∧ δ_claim
+    function claim&#40;&#41; external &#123;
+        require&#40;msg.sender &#61;&#61; creator, &quot;Not creator&quot;&#41;;
+        require&#40;phase &#61;&#61; Phase.Succeeded, &quot;Not succeeded&quot;&#41;;
+
+        phase &#61; Phase.Succeeded; // stays &#40;or add Claimed phase&#41;
+        payable&#40;creator&#41;.transfer&#40;totalPledged&#41;;
+    &#125;
+
+    // G_refund ∧ δ_refund
+    function refund&#40;&#41; external &#123;
+        require&#40;phase &#61;&#61; Phase.Failed, &quot;Not failed&quot;&#41;;
+        uint256 amount &#61; pledges&#91;msg.sender&#93;;
+        require&#40;amount &gt; 0, &quot;Nothing to refund&quot;&#41;;
+
+        pledges&#91;msg.sender&#93; &#61; 0;  // CEI: update state before transfer
+        payable&#40;msg.sender&#41;.transfer&#40;amount&#41;;
+    &#125;
+&#125;</code></pre>
+<p>Notice: every <code>require</code> is a conjunct from \(G\). Every state mutation is from \(\delta\). The enum is the phase variable from the state diagram. <strong>The math designed the contract. Solidity just transcribed it.</strong></p>
+<hr />
+<h2 id="why_this_works_better_than_thinking_in_solidity"><a href="#why_this_works_better_than_thinking_in_solidity" class="header-anchor">Why This Works Better Than &quot;Thinking in Solidity&quot;</a></h2>
+<table><tr><th align="right">Thinking in Solidity</th><th align="right">Thinking in Math</th></tr><tr><td align="right">&quot;I need a mapping and a require&quot;</td><td align="right">&quot;What&#39;s the state space? What are the guards?&quot;</td></tr><tr><td align="right">Bottom-up: syntax → structure</td><td align="right">Top-down: structure → syntax</td></tr><tr><td align="right">Easy to forget edge cases</td><td align="right">Guards are explicit logical formulas — enumerate conjuncts</td></tr><tr><td align="right">Hard to spot missing invariants</td><td align="right">Invariants are stated upfront, verified against all transitions</td></tr><tr><td align="right">Access control is ad hoc</td><td align="right">Permission matrix is a table you fill in</td></tr><tr><td align="right">Phase transitions are implicit</td><td align="right">State diagram makes them visual</td></tr></table>
+<p>The math gives you a <strong>specification</strong> that&#39;s independent of any programming language. You could implement the same spec in Solidity, Vyper, Cairo, or even a traditional database. The smart contract is just one realization of the formal model.</p>
+<hr />
+<h2 id="cheat_sheet_math_solidity_translation"><a href="#cheat_sheet_math_solidity_translation" class="header-anchor">Cheat Sheet: Math → Solidity Translation</a></h2>
+<table><tr><th align="right">You&#39;re thinking about...</th><th align="right">Math notation</th><th align="right">Solidity</th></tr><tr><td align="right">What data do I store?</td><td align="right">\(S = D_1 \times \cdots \times D_n\)</td><td align="right">State variables</td></tr><tr><td align="right">What can users do?</td><td align="right">\(A = \{a_1, a_2, \ldots\}\)</td><td align="right">Functions</td></tr><tr><td align="right">When is an action allowed?</td><td align="right">\(G(s, a) = \phi_1 \wedge \cdots\)</td><td align="right"><code>require</code> &#43; modifiers</td></tr><tr><td align="right">What changes?</td><td align="right">\(\delta(s, a) = s'\)</td><td align="right">Assignment statements</td></tr><tr><td align="right">What must always be true?</td><td align="right">\(\forall s: I(s)\)</td><td align="right"><code>assert</code> &#40;or off-chain tests&#41;</td></tr><tr><td align="right">What happened?</td><td align="right">\(O(s, a) = e_1, e_2, \ldots\)</td><td align="right"><code>emit Event&#40;...&#41;</code></td></tr><tr><td align="right">Who can do what?</td><td align="right">\(R \subseteq \text{Addr} \times A\)</td><td align="right"><code>onlyOwner</code>, <code>onlyRole&#40;...&#41;</code></td></tr><tr><td align="right">What phases exist?</td><td align="right">Finite set \(\{p_1, \ldots, p_k\}\)</td><td align="right"><code>enum</code></td></tr><tr><td align="right">How do phases change?</td><td align="right">LTS edges</td><td align="right">Functions with <code>require&#40;phase &#61;&#61; ...&#41;</code></td></tr></table>
+<hr />
+<h2 id="the_takeaway"><a href="#the_takeaway" class="header-anchor">The Takeaway</a></h2>
+<p><strong>Before you write Solidity, answer these questions on paper:</strong></p>
+<ol>
+<li><p>What does the contract need to remember? → <strong>State space</strong> \(S\)</p>
+</li>
+<li><p>What can users do? → <strong>Action set</strong> \(A\)</p>
+</li>
+<li><p>Under what conditions? → <strong>Guard predicates</strong> \(G\)</p>
+</li>
+<li><p>What changes when they do it? → <strong>Transition function</strong> \(\delta\)</p>
+</li>
+<li><p>What must always be true? → <strong>Invariants</strong> \(I\)</p>
+</li>
+<li><p>Who can do what? → <strong>Permission matrix</strong> \(R\)</p>
+</li>
+<li><p>What are the phases? → <strong>State diagram</strong></p>
+</li>
+</ol>
+<p>If you can answer all seven, the Solidity writes itself. If you can&#39;t, you don&#39;t understand the problem yet — and no amount of coding will fix that.</p>
+<div class="page-foot">
+    Contact me by <a href="mailto:skchu@wustl.edu">E-mail</a> | <a href="https://github.com/kchu25">Github</a> | <a href="https://www.linkedin.com/in/kchu1/">Linkedin</a>
+    <br>
+    This work is licensed under <a href="http://creativecommons.org/licenses/by-sa/4.0/">CC BY-SA 4.0</a>.  Last modified: March 01, 2026.
+    <br>
+    Website built with <a href="https://github.com/tlienart/Franklin.jl">Franklin.jl</a> and the <a href="https://julialang.org">Julia language</a>.
+</div>
+</div><!-- CONTENT ENDS HERE -->
+    
+        <script src="/libs/katex/katex.min.js"></script>
+<script src="/libs/katex/contrib/auto-render.min.js"></script>
+<script>renderMathInElement(document.body)</script>
+
+    
+    
+        <script src="/libs/highlight/highlight.min.js"></script>
+<script>
+// Register Solidity language for highlight.js
+hljs.registerLanguage('solidity', function(hljs) {
+  return {
+    keywords: {
+      keyword: 'contract interface library pragma import using struct enum event modifier function returns return require revert assert emit new delete if else for while do break continue try catch throw this super constructor fallback receive ' +
+                'public private internal external pure view payable virtual override constant immutable anonymous indexed storage memory calldata',
+      literal: 'true false wei gwei ether seconds minutes hours days weeks years',
+      built_in: 'msg block tx abi now sender value gas data origin gasprice blockhash gasleft address uint int bytes string bool mapping'
+    },
+    contains: [
+      hljs.C_LINE_COMMENT_MODE,
+      hljs.C_BLOCK_COMMENT_MODE,
+      hljs.QUOTE_STRING_MODE,
+      hljs.APOS_STRING_MODE,
+      {
+        className: 'number',
+        begin: '\\b(0[xX][a-fA-F0-9]+|(\\d+(\\.\\d*)?|\\.\\d+)([eE][-+]?\\d+)?)',
+        relevance: 0
+      },
+      {
+        className: 'type',
+        begin: '\\b(uint|int|bytes|byte|string|address|bool|ufixed|fixed)(\\d+x\\d+|\\d+)?\\b'
+      },
+      {
+        className: 'function',
+        beginKeywords: 'function modifier event constructor fallback receive',
+        end: '[{;]',
+        excludeEnd: true,
+        contains: [
+          {
+            className: 'title',
+            begin: '[A-Za-z$_][0-9A-Za-z$_]*',
+            relevance: 0
+          },
+          {
+            className: 'params',
+            begin: '\\(', end: '\\)',
+            contains: [hljs.C_LINE_COMMENT_MODE, hljs.C_BLOCK_COMMENT_MODE]
+          }
+        ]
+      }
+    ]
+  };
+});
+
+hljs.highlightAll();
+hljs.configure({tabReplace: '    '});
+</script>
+
+
+    
+  </body>
+</html>

@@ -110,6 +110,12 @@
     <priority>0.5</priority>
 </url>
 <url>
+    <loc>https://kchu25.github.io/blog/solidity/what_can_smart_contracts_do/index.html</loc>
+    <lastmod>2026-03-01</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.5</priority>
+</url>
+<url>
     <loc>https://kchu25.github.io/blog/desci/roadmap/index.html</loc>
     <lastmod>2026-02-21</lastmod>
     <changefreq>monthly</changefreq>
