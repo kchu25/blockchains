@@ -1,0 +1,680 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@700;900&display=swap" rel="stylesheet">
+  <style>
+    @font-face {
+      font-family: 'BPdots';
+      src: url('/blockchains/assets/fonts/BPdots/BPdots.otf') format('opentype');
+      font-weight: normal;
+      font-style: normal;
+    }
+    @font-face {
+      font-family: 'BPdots';
+      src: url('/blockchains/assets/fonts/BPdots/BPdotsBold.otf') format('opentype');
+      font-weight: bold;
+      font-style: normal;
+    }
+  </style>
+   <link rel="stylesheet" href="/libs/katex/katex.min.css">
+     
+   <link rel="stylesheet" href="/libs/highlight/styles/atom-one-dark.min.css">
+   
+  <link rel="stylesheet" href="/css/franklin.css">
+<link rel="stylesheet" href="/css/hypertext.css">
+<link rel="icon" href="/assets/favicon.png">
+
+   <title>What Can Smart Contracts Actually Do? A Capabilities Inventory</title>  
+</head>
+<body>
+<header>
+  <h1 style="color:#283747; font-family:'BPdots', monospace; font-size:2.5em; font-weight:normal; letter-spacing:0.1em">blockchains</h1>
+  <nav>
+    <a href="/" class="current">Tags</a>
+  | <a href="/blog/" >Notes</a>
+  <hr/>
+  </nav>
+</header>
+
+
+<!-- Content appended here -->
+<div class="franklin-content"><h1 id="what_can_smart_contracts_actually_do"><a href="#what_can_smart_contracts_actually_do" class="header-anchor">What Can Smart Contracts Actually Do?</a></h1>
+<blockquote>
+<p><strong>The question:</strong> Given the syntax and design constraints of Solidity &#40;deterministic, gas-bounded, no I/O, no floating point, public state&#41;, what is the <strong>full envelope</strong> of things a smart contract can achieve? This post is an inventory of capabilities derived from first principles—not a list of existing projects, but a map of what&#39;s <em>possible</em>.</p>
+</blockquote>
+<hr />
+<h2 id="start_from_the_primitives"><a href="#start_from_the_primitives" class="header-anchor">Start From the Primitives</a></h2>
+<p>A Solidity contract is a state machine \((\Sigma, s_0, \mathcal{T})\) with these raw ingredients:</p>
+<table><tr><th align="right">Ingredient</th><th align="right">What it gives you</th></tr><tr><td align="right"><strong>Persistent state</strong> &#40;mappings, arrays, structs&#41;</td><td align="right">Memory that survives across calls</td></tr><tr><td align="right"><strong><code>msg.sender</code></strong></td><td align="right">Authenticated identity &#40;cryptographically verified&#41;</td></tr><tr><td align="right"><strong><code>msg.value</code></strong></td><td align="right">Native value transfer &#40;ETH&#41;</td></tr><tr><td align="right"><strong><code>block.timestamp</code></strong></td><td align="right">Time awareness</td></tr><tr><td align="right"><strong><code>block.number</code></strong></td><td align="right">Sequence awareness</td></tr><tr><td align="right"><strong>Modifiers / <code>require</code></strong></td><td align="right">Enforceable rules</td></tr><tr><td align="right"><strong>Events</strong></td><td align="right">Observable, indexable logs</td></tr><tr><td align="right"><strong>Inter-contract calls</strong></td><td align="right">Composability &#40;contracts calling contracts&#41;</td></tr><tr><td align="right"><strong><code>keccak256</code></strong></td><td align="right">Cryptographic commitments</td></tr><tr><td align="right"><strong>Immutability</strong></td><td align="right">Code can&#39;t be changed after deployment</td></tr></table>
+<p>Every application below is a <strong>composition</strong> of these primitives. Nothing more. The power comes from combining them in a trustless, permissionless environment where no single party can alter the rules.</p>
+<hr />
+<h2 id="the_complete_capabilities_map"><a href="#the_complete_capabilities_map" class="header-anchor">The Complete Capabilities Map</a></h2>
+<h3 id="tokenization_representing_ownership"><a href="#tokenization_representing_ownership" class="header-anchor"><ol>
+<li><p>Tokenization — Representing Ownership</p>
+</li>
+</ol>
+</a></h3>
+<p><strong>What:</strong> Turn any discrete or fungible thing into a transferable on-chain asset.</p>
+<p><strong>How:</strong> A mapping <code>address → uint256</code> &#40;fungible&#41; or <code>uint256 → address</code> &#40;non-fungible&#41; with transfer rules.</p>
+<pre><code class="language-solidity">// Fungible &#40;ERC-20&#41;: &quot;who owns how much&quot;
+mapping&#40;address &#61;&gt; uint256&#41; public balanceOf;
+
+// Non-fungible &#40;ERC-721&#41;: &quot;who owns which item&quot;
+mapping&#40;uint256 &#61;&gt; address&#41; public ownerOf;</code></pre>
+<p><strong>What you can tokenize:</strong></p>
+<ul>
+<li><p>Currency, stablecoins</p>
+</li>
+<li><p>Equity shares, bonds, real estate fractions</p>
+</li>
+<li><p>Carbon credits, energy certificates</p>
+</li>
+<li><p>Intellectual property rights</p>
+</li>
+<li><p>Loyalty points, in-game items</p>
+</li>
+<li><p>Academic credentials &#40;Soulbound Tokens — non-transferable&#41;</p>
+</li>
+</ul>
+<p><strong>Why finance came first:</strong> Tokenization of money is the simplest case — a mapping of addresses to balances. It requires no oracle, no external data, no subjective judgment. Pure state accounting.</p>
+<hr />
+<h3 id="ol_start2_automated_compliance_rules_that_cant_be_bypassed"><a href="#ol_start2_automated_compliance_rules_that_cant_be_bypassed" class="header-anchor"><ol start="2">
+<li><p>Automated Compliance — Rules That Can&#39;t Be Bypassed</p>
+</li>
+</ol>
+</a></h3>
+<p><strong>What:</strong> Encode legal or business rules directly into the transfer logic.</p>
+<p><strong>How:</strong> Modifiers and <code>require</code> statements that gate every state transition.</p>
+<pre><code class="language-solidity">modifier kycApproved&#40;address user&#41; &#123;
+    require&#40;kycRegistry&#91;user&#93;, &quot;KYC not approved&quot;&#41;;
+    _;
+&#125;
+
+modifier transferLimit&#40;uint256 amount&#41; &#123;
+    require&#40;amount &lt;&#61; dailyLimit&#91;msg.sender&#93;, &quot;Exceeds daily limit&quot;&#41;;
+    _;
+&#125;
+
+function transfer&#40;address to, uint256 amount&#41; 
+    public 
+    kycApproved&#40;msg.sender&#41; 
+    kycApproved&#40;to&#41;
+    transferLimit&#40;amount&#41; 
+&#123;
+    balanceOf&#91;msg.sender&#93; -&#61; amount;
+    balanceOf&#91;to&#93; &#43;&#61; amount;
+&#125;</code></pre>
+<p><strong>What you can enforce:</strong></p>
+<ul>
+<li><p>KYC/AML checks &#40;via oracle-linked registry&#41;</p>
+</li>
+<li><p>Transfer caps &#40;daily, per-transaction, lifetime&#41;</p>
+</li>
+<li><p>Vesting schedules &#40;tokens locked until timestamp&#41;</p>
+</li>
+<li><p>Geographic restrictions &#40;address → jurisdiction mapping&#41;</p>
+</li>
+<li><p>Accredited investor gates</p>
+</li>
+<li><p>Regulatory reporting &#40;events emitted on every transfer&#41;</p>
+</li>
+</ul>
+<p><strong>The insight:</strong> In traditional finance, compliance is a <em>layer on top</em> — auditors check after the fact. In smart contracts, compliance is the <em>code itself</em>. Non-compliant transactions don&#39;t execute. They revert.</p>
+<hr />
+<h3 id="ol_start3_escrow_conditional_release_trustless_intermediation"><a href="#ol_start3_escrow_conditional_release_trustless_intermediation" class="header-anchor"><ol start="3">
+<li><p>Escrow &amp; Conditional Release — Trustless Intermediation</p>
+</li>
+</ol>
+</a></h3>
+<p><strong>What:</strong> Hold funds and release them only when conditions are met. No third-party escrow agent needed.</p>
+<p><strong>How:</strong> Contract holds ETH/tokens; <code>require</code> checks conditions before releasing.</p>
+<pre><code class="language-solidity">contract Escrow &#123;
+    address public buyer;
+    address public seller;
+    uint256 public amount;
+    bool public buyerApproved;
+    bool public sellerDelivered;
+
+    function confirmDelivery&#40;&#41; external &#123;
+        require&#40;msg.sender &#61;&#61; buyer, &quot;Not buyer&quot;&#41;;
+        buyerApproved &#61; true;
+        if &#40;sellerDelivered &amp;&amp; buyerApproved&#41; &#123;
+            payable&#40;seller&#41;.transfer&#40;amount&#41;;
+        &#125;
+    &#125;
+&#125;</code></pre>
+<p><strong>Use cases:</strong></p>
+<ul>
+<li><p>Real estate closings &#40;funds released when title transfers&#41;</p>
+</li>
+<li><p>Freelance work &#40;payment on milestone completion&#41;</p>
+</li>
+<li><p>Cross-border trade &#40;release on shipment confirmation via oracle&#41;</p>
+</li>
+<li><p>Domain name sales</p>
+</li>
+<li><p>Any two-party transaction with mutual distrust</p>
+</li>
+</ul>
+<hr />
+<h3 id="ol_start4_voting_governance_collective_decision-making"><a href="#ol_start4_voting_governance_collective_decision-making" class="header-anchor"><ol start="4">
+<li><p>Voting &amp; Governance — Collective Decision-Making</p>
+</li>
+</ol>
+</a></h3>
+<p><strong>What:</strong> Transparent, auditable, tamper-proof voting.</p>
+<p><strong>How:</strong> Mapping of <code>address → bool</code> &#40;voted?&#41;, tallying, time-bounded proposals.</p>
+<pre><code class="language-solidity">struct Proposal &#123;
+    string description;
+    uint256 forVotes;
+    uint256 againstVotes;
+    uint256 deadline;
+    mapping&#40;address &#61;&gt; bool&#41; hasVoted;
+&#125;
+
+function vote&#40;uint256 proposalId, bool support&#41; external &#123;
+    Proposal storage p &#61; proposals&#91;proposalId&#93;;
+    require&#40;block.timestamp &lt; p.deadline, &quot;Voting ended&quot;&#41;;
+    require&#40;&#33;p.hasVoted&#91;msg.sender&#93;, &quot;Already voted&quot;&#41;;
+    
+    p.hasVoted&#91;msg.sender&#93; &#61; true;
+    if &#40;support&#41; p.forVotes &#43;&#61; votingPower&#91;msg.sender&#93;;
+    else p.againstVotes &#43;&#61; votingPower&#91;msg.sender&#93;;
+&#125;</code></pre>
+<p><strong>What you can govern:</strong></p>
+<ul>
+<li><p>Protocol parameter changes &#40;interest rates, fees&#41;</p>
+</li>
+<li><p>Treasury spending &#40;DAO allocates funds&#41;</p>
+</li>
+<li><p>Membership decisions &#40;admit/remove members&#41;</p>
+</li>
+<li><p>Upgrade approvals &#40;proxy contract points to new logic&#41;</p>
+</li>
+<li><p>Grant allocation &#40;community votes on funding proposals&#41;</p>
+</li>
+<li><p>Any collective decision that currently requires a board, committee, or parliament</p>
+</li>
+</ul>
+<p><strong>Why this matters:</strong> The vote tally is public. The counting is deterministic. No one can stuff ballots. No one can change the rules mid-vote. The code <em>is</em> the election commission.</p>
+<hr />
+<h3 id="ol_start5_time-locked_mechanisms_scheduled_execution"><a href="#ol_start5_time-locked_mechanisms_scheduled_execution" class="header-anchor"><ol start="5">
+<li><p>Time-Locked Mechanisms — Scheduled Execution</p>
+</li>
+</ol>
+</a></h3>
+<p><strong>What:</strong> Actions that become available or expire based on <code>block.timestamp</code>.</p>
+<p><strong>How:</strong> Simple comparisons against time.</p>
+<pre><code class="language-solidity">uint256 public unlockTime;
+
+constructor&#40;uint256 _lockDuration&#41; payable &#123;
+    unlockTime &#61; block.timestamp &#43; _lockDuration;
+&#125;
+
+function withdraw&#40;&#41; external &#123;
+    require&#40;block.timestamp &gt;&#61; unlockTime, &quot;Still locked&quot;&#41;;
+    payable&#40;owner&#41;.transfer&#40;address&#40;this&#41;.balance&#41;;
+&#125;</code></pre>
+<p><strong>Use cases:</strong></p>
+<ul>
+<li><p><strong>Vesting</strong>: Employee tokens unlock linearly over 4 years</p>
+</li>
+<li><p><strong>Timelocks</strong>: Governance decisions have 48-hour delay before execution &#40;safety buffer&#41;</p>
+</li>
+<li><p><strong>Auctions</strong>: Bidding period opens and closes at specific times</p>
+</li>
+<li><p><strong>Insurance</strong>: Claims must be filed within 30 days</p>
+</li>
+<li><p><strong>Subscriptions</strong>: Access expires after payment period</p>
+</li>
+<li><p><strong>Dead man&#39;s switch</strong>: If owner doesn&#39;t check in for 1 year, funds go to beneficiary</p>
+</li>
+</ul>
+<hr />
+<h3 id="ol_start6_automated_market_making_algorithmic_exchange"><a href="#ol_start6_automated_market_making_algorithmic_exchange" class="header-anchor"><ol start="6">
+<li><p>Automated Market Making — Algorithmic Exchange</p>
+</li>
+</ol>
+</a></h3>
+<p><strong>What:</strong> Exchange assets without an order book or market maker. Price determined by math.</p>
+<p><strong>How:</strong> Two token reserves in a contract; price computed from the ratio.</p>
+<pre><code class="language-solidity">// Constant product: x * y &#61; k
+uint256 public reserveA;
+uint256 public reserveB;
+
+function getPrice&#40;uint256 inputAmount&#41; public view returns &#40;uint256&#41; &#123;
+    // Δy &#61; &#40;y * Δx&#41; / &#40;x &#43; Δx&#41;
+    return &#40;reserveB * inputAmount&#41; / &#40;reserveA &#43; inputAmount&#41;;
+&#125;
+
+function swap&#40;uint256 inputAmount&#41; external &#123;
+    uint256 outputAmount &#61; getPrice&#40;inputAmount&#41;;
+    // Transfer tokens...
+    reserveA &#43;&#61; inputAmount;
+    reserveB -&#61; outputAmount;
+&#125;</code></pre>
+<p><strong>Why this works on-chain:</strong> The pricing function is pure math &#40;no oracle needed&#41;. The reserves are public state. Anyone can provide liquidity, anyone can trade. No exchange operator.</p>
+<p><strong>Extends to:</strong> Lending rates &#40;supply/demand curves&#41;, insurance premiums &#40;risk pools&#41;, prediction markets &#40;outcome shares&#41;.</p>
+<hr />
+<h3 id="ol_start7_commit-reveal_schemes_hiding_information_temporarily"><a href="#ol_start7_commit-reveal_schemes_hiding_information_temporarily" class="header-anchor"><ol start="7">
+<li><p>Commit-Reveal Schemes — Hiding Information Temporarily</p>
+</li>
+</ol>
+</a></h3>
+<p><strong>What:</strong> Let users commit to a value without revealing it, then reveal later.</p>
+<p><strong>How:</strong> <code>keccak256</code> hashing for commitment; two-phase protocol.</p>
+<pre><code class="language-solidity">mapping&#40;address &#61;&gt; bytes32&#41; public commitments;
+
+// Phase 1: Commit &#40;hash hides the value&#41;
+function commit&#40;bytes32 hash&#41; external &#123;
+    commitments&#91;msg.sender&#93; &#61; hash;
+&#125;
+
+// Phase 2: Reveal &#40;prove your commitment&#41;
+function reveal&#40;uint256 value, bytes32 salt&#41; external &#123;
+    require&#40;keccak256&#40;abi.encodePacked&#40;value, salt&#41;&#41; &#61;&#61; commitments&#91;msg.sender&#93;, 
+            &quot;Invalid reveal&quot;&#41;;
+    // Process the revealed value
+&#125;</code></pre>
+<p><strong>Use cases:</strong></p>
+<ul>
+<li><p><strong>Sealed-bid auctions</strong>: Bidders commit bids, reveal after deadline</p>
+</li>
+<li><p><strong>Random number generation</strong>: Multiple parties commit seeds, combine after reveal</p>
+</li>
+<li><p><strong>Voting</strong>: Hide votes until tally &#40;prevents bandwagon effect&#41;</p>
+</li>
+<li><p><strong>Games</strong>: Rock-paper-scissors, poker hands</p>
+</li>
+<li><p><strong>DNS registration</strong>: Prevent front-running of domain claims</p>
+</li>
+</ul>
+<p><strong>The constraint:</strong> Blockchain state is public. You <em>cannot</em> hide data on-chain natively. Commit-reveal is the workaround — hide behind a hash, reveal when safe.</p>
+<hr />
+<h3 id="ol_start8_access_control_role_management_permissioned_systems"><a href="#ol_start8_access_control_role_management_permissioned_systems" class="header-anchor"><ol start="8">
+<li><p>Access Control &amp; Role Management — Permissioned Systems</p>
+</li>
+</ol>
+</a></h3>
+<p><strong>What:</strong> Define who can do what, enforced cryptographically.</p>
+<p><strong>How:</strong> Mappings of <code>address → role</code> with modifier gates.</p>
+<pre><code class="language-solidity">mapping&#40;bytes32 &#61;&gt; mapping&#40;address &#61;&gt; bool&#41;&#41; public roles;
+
+bytes32 public constant ADMIN &#61; keccak256&#40;&quot;ADMIN&quot;&#41;;
+bytes32 public constant MINTER &#61; keccak256&#40;&quot;MINTER&quot;&#41;;
+bytes32 public constant PAUSER &#61; keccak256&#40;&quot;PAUSER&quot;&#41;;
+
+modifier onlyRole&#40;bytes32 role&#41; &#123;
+    require&#40;roles&#91;role&#93;&#91;msg.sender&#93;, &quot;Unauthorized&quot;&#41;;
+    _;
+&#125;
+
+function mint&#40;address to, uint256 amount&#41; external onlyRole&#40;MINTER&#41; &#123; ... &#125;
+function pause&#40;&#41; external onlyRole&#40;PAUSER&#41; &#123; ... &#125;</code></pre>
+<p><strong>What you can build:</strong></p>
+<ul>
+<li><p>Multi-tier organizational hierarchies</p>
+</li>
+<li><p>Delegated authority &#40;admin grants minter role&#41;</p>
+</li>
+<li><p>Temporary permissions &#40;role &#43; expiry timestamp&#41;</p>
+</li>
+<li><p>Separation of duties &#40;minter ≠ pauser ≠ admin&#41;</p>
+</li>
+</ul>
+<hr />
+<h3 id="ol_start9_reputation_attestation_trustless_track_records"><a href="#ol_start9_reputation_attestation_trustless_track_records" class="header-anchor"><ol start="9">
+<li><p>Reputation &amp; Attestation — Trustless Track Records</p>
+</li>
+</ol>
+</a></h3>
+<p><strong>What:</strong> Record verifiable actions and compute trust metrics on-chain.</p>
+<p><strong>How:</strong> Events &#43; aggregated state per address.</p>
+<pre><code class="language-solidity">struct Reputation &#123;
+    uint256 tasksCompleted;
+    uint256 totalStaked;
+    uint8 avgRating;
+&#125;
+
+mapping&#40;address &#61;&gt; Reputation&#41; public reputation;</code></pre>
+<p><strong>Use cases:</strong></p>
+<ul>
+<li><p>Freelancer ratings &#40;permanent, portable across platforms&#41;</p>
+</li>
+<li><p>Peer review scoring &#40;DeSci&#41;</p>
+</li>
+<li><p>DAO contribution tracking &#40;voting power from work, not wealth&#41;</p>
+</li>
+<li><p>Soulbound Tokens &#40;non-transferable credentials: degrees, certifications, badges&#41;</p>
+</li>
+<li><p>Credit scoring without a central bureau</p>
+</li>
+</ul>
+<p>&#40;See the <a href="/blog/solidity/reputation_systems/">reputation systems post</a> for a deep dive.&#41;</p>
+<hr />
+<h3 id="ol_start10_composability_contracts_calling_contracts"><a href="#ol_start10_composability_contracts_calling_contracts" class="header-anchor"><ol start="10">
+<li><p>Composability — Contracts Calling Contracts</p>
+</li>
+</ol>
+</a></h3>
+<p><strong>What:</strong> Contracts can call other contracts&#39; public functions. This is the <em>killer feature</em>.</p>
+<p><strong>How:</strong> Interface declarations &#43; external calls.</p>
+<pre><code class="language-solidity">interface IERC20 &#123;
+    function transferFrom&#40;address from, address to, uint256 amount&#41; external;
+&#125;
+
+contract LendingPool &#123;
+    IERC20 public token;
+    
+    function deposit&#40;uint256 amount&#41; external &#123;
+        // Pull tokens from user into this contract
+        token.transferFrom&#40;msg.sender, address&#40;this&#41;, amount&#41;;
+        // Update internal accounting...
+    &#125;
+&#125;</code></pre>
+<p><strong>Why this is revolutionary:</strong> In traditional software, APIs are behind authentication, rate limits, terms of service, and can be revoked. On-chain, any contract can call any public function of any other contract, <em>permissionlessly</em>. This enables:</p>
+<ul>
+<li><p><strong>Flash loans</strong>: Borrow → use → repay in a single transaction &#40;no collateral needed if atomicity is guaranteed&#41;</p>
+</li>
+<li><p><strong>Aggregators</strong>: One contract queries 5 DEXes and routes to the best price</p>
+</li>
+<li><p><strong>Yield strategies</strong>: Contract A deposits into B, which stakes into C, which farms D</p>
+</li>
+<li><p><strong>Composable identity</strong>: Lending contract checks your reputation contract before approving a loan</p>
+</li>
+</ul>
+<p><strong>The &quot;money lego&quot; metaphor:</strong> Each contract is a building block. Anyone can snap them together in new combinations without permission.</p>
+<hr />
+<h3 id="ol_start11_insurance_risk_pooling_automated_claims"><a href="#ol_start11_insurance_risk_pooling_automated_claims" class="header-anchor"><ol start="11">
+<li><p>Insurance &amp; Risk Pooling — Automated Claims</p>
+</li>
+</ol>
+</a></h3>
+<p><strong>What:</strong> Pool funds from many participants; pay out when predefined conditions are met.</p>
+<p><strong>How:</strong> Deposits into a pool; oracle-triggered or vote-triggered payouts.</p>
+<pre><code class="language-solidity">contract CropInsurance &#123;
+    mapping&#40;address &#61;&gt; uint256&#41; public premiums;
+    uint256 public pool;
+    
+    function payPremium&#40;&#41; external payable &#123;
+        premiums&#91;msg.sender&#93; &#43;&#61; msg.value;
+        pool &#43;&#61; msg.value;
+    &#125;
+    
+    // Oracle reports drought
+    function triggerPayout&#40;address farmer&#41; external onlyOracle &#123;
+        uint256 payout &#61; premiums&#91;farmer&#93; * 3;  // 3x premium
+        require&#40;pool &gt;&#61; payout, &quot;Pool depleted&quot;&#41;;
+        pool -&#61; payout;
+        payable&#40;farmer&#41;.transfer&#40;payout&#41;;
+    &#125;
+&#125;</code></pre>
+<p><strong>Use cases:</strong></p>
+<ul>
+<li><p>Crop insurance &#40;weather oracle triggers payout&#41;</p>
+</li>
+<li><p>Flight delay insurance &#40;flight data oracle&#41;</p>
+</li>
+<li><p>Smart contract hack insurance &#40;governance vote triggers payout&#41;</p>
+</li>
+<li><p>Health insurance pools &#40;medical oracle &#43; privacy layer&#41;</p>
+</li>
+</ul>
+<p><strong>The constraint:</strong> The hard part is the oracle — who decides if the drought happened? The contract can only enforce rules on data it receives. It can&#39;t observe the real world.</p>
+<hr />
+<h3 id="ol_start12_supply_chain_tracking_provenance_ledger"><a href="#ol_start12_supply_chain_tracking_provenance_ledger" class="header-anchor"><ol start="12">
+<li><p>Supply Chain Tracking — Provenance Ledger</p>
+</li>
+</ol>
+</a></h3>
+<p><strong>What:</strong> Record the journey of a physical item through a supply chain.</p>
+<p><strong>How:</strong> Events and state transitions representing checkpoints.</p>
+<pre><code class="language-solidity">enum Stage &#123; Manufactured, Shipped, InTransit, Delivered, Verified &#125;
+
+struct Item &#123;
+    uint256 id;
+    Stage stage;
+    address currentHolder;
+    uint256 lastUpdated;
+&#125;
+
+mapping&#40;uint256 &#61;&gt; Item&#41; public items;
+
+event StageChanged&#40;uint256 indexed itemId, Stage newStage, address indexed by&#41;;
+
+function advanceStage&#40;uint256 itemId&#41; external &#123;
+    Item storage item &#61; items&#91;itemId&#93;;
+    require&#40;msg.sender &#61;&#61; item.currentHolder, &quot;Not holder&quot;&#41;;
+    require&#40;uint8&#40;item.stage&#41; &lt; uint8&#40;Stage.Verified&#41;, &quot;Already final&quot;&#41;;
+    
+    item.stage &#61; Stage&#40;uint8&#40;item.stage&#41; &#43; 1&#41;;
+    item.lastUpdated &#61; block.timestamp;
+    
+    emit StageChanged&#40;itemId, item.stage, msg.sender&#41;;
+&#125;</code></pre>
+<p><strong>What you can track:</strong></p>
+<ul>
+<li><p>Food: farm → processor → distributor → retailer → consumer</p>
+</li>
+<li><p>Pharmaceuticals: manufacturer → warehouse → pharmacy → patient</p>
+</li>
+<li><p>Luxury goods: authenticity verification &#40;is this bag really Hermès?&#41;</p>
+</li>
+<li><p>Diamonds: mine → cutter → dealer → jeweler &#40;conflict-free certification&#41;</p>
+</li>
+</ul>
+<p><strong>The constraint:</strong> The contract trusts whoever calls <code>advanceStage</code>. If the warehouse lies about shipping, the blockchain faithfully records the lie. <strong>Garbage in, garbage out.</strong> Physical-world verification still requires trusted participants or IoT devices.</p>
+<hr />
+<h3 id="ol_start13_identity_credentials_self-sovereign_identity"><a href="#ol_start13_identity_credentials_self-sovereign_identity" class="header-anchor"><ol start="13">
+<li><p>Identity &amp; Credentials — Self-Sovereign Identity</p>
+</li>
+</ol>
+</a></h3>
+<p><strong>What:</strong> Users own their identity data; contracts verify claims without a central authority.</p>
+<p><strong>How:</strong> Attestation contracts &#43; Soulbound Tokens &#40;non-transferable NFTs&#41;.</p>
+<pre><code class="language-solidity">contract CredentialRegistry &#123;
+    // Issuer attests: &quot;this address completed course X&quot;
+    mapping&#40;address &#61;&gt; mapping&#40;bytes32 &#61;&gt; bool&#41;&#41; public credentials;
+    
+    function issue&#40;address recipient, bytes32 credentialHash&#41; 
+        external 
+        onlyIssuer 
+    &#123;
+        credentials&#91;recipient&#93;&#91;credentialHash&#93; &#61; true;
+        emit CredentialIssued&#40;recipient, credentialHash, msg.sender&#41;;
+    &#125;
+    
+    // Anyone can verify
+    function verify&#40;address user, bytes32 credentialHash&#41; 
+        external 
+        view 
+        returns &#40;bool&#41; 
+    &#123;
+        return credentials&#91;user&#93;&#91;credentialHash&#93;;
+    &#125;
+&#125;</code></pre>
+<p><strong>Use cases:</strong></p>
+<ul>
+<li><p>University degree verification &#40;no calling the registrar&#41;</p>
+</li>
+<li><p>Professional certifications &#40;on-chain, permanent&#41;</p>
+</li>
+<li><p>KYC attestation &#40;verified once, reusable across platforms&#41;</p>
+</li>
+<li><p>Age verification &#40;zero-knowledge proof: &quot;I&#39;m over 18&quot; without revealing birthdate&#41;</p>
+</li>
+</ul>
+<hr />
+<h3 id="ol_start14_subscription_recurring_payments"><a href="#ol_start14_subscription_recurring_payments" class="header-anchor"><ol start="14">
+<li><p>Subscription &amp; Recurring Payments</p>
+</li>
+</ol>
+</a></h3>
+<p><strong>What:</strong> Authorize a contract to pull payments on a schedule.</p>
+<p><strong>How:</strong> Allowance pattern &#43; timestamp checks.</p>
+<pre><code class="language-solidity">struct Subscription &#123;
+    uint256 amount;
+    uint256 interval;    // e.g., 30 days
+    uint256 lastCharged;
+&#125;
+
+mapping&#40;address &#61;&gt; Subscription&#41; public subscriptions;
+
+function charge&#40;address subscriber&#41; external &#123;
+    Subscription storage sub &#61; subscriptions&#91;subscriber&#93;;
+    require&#40;block.timestamp &gt;&#61; sub.lastCharged &#43; sub.interval, &quot;Too early&quot;&#41;;
+    
+    sub.lastCharged &#61; block.timestamp;
+    token.transferFrom&#40;subscriber, address&#40;this&#41;, sub.amount&#41;;
+&#125;</code></pre>
+<p><strong>The constraint:</strong> Solidity can&#39;t auto-execute. Someone &#40;a bot, a keeper network like Chainlink Keepers&#41; must call <code>charge&#40;&#41;</code> at the right time. The contract only enforces that charging <em>can&#39;t happen too early</em>.</p>
+<hr />
+<h3 id="ol_start15_prediction_markets_betting_on_outcomes"><a href="#ol_start15_prediction_markets_betting_on_outcomes" class="header-anchor"><ol start="15">
+<li><p>Prediction Markets — Betting on Outcomes</p>
+</li>
+</ol>
+</a></h3>
+<p><strong>What:</strong> Users bet on future events; payouts determined by outcomes.</p>
+<p><strong>How:</strong> Users buy shares in outcomes; oracle resolves; winners claim proportional payout.</p>
+<pre><code class="language-solidity">// Simplified: binary prediction market
+mapping&#40;address &#61;&gt; uint256&#41; public yesShares;
+mapping&#40;address &#61;&gt; uint256&#41; public noShares;
+uint256 public totalYes;
+uint256 public totalNo;
+bool public resolved;
+bool public outcome;
+
+function buyYes&#40;&#41; external payable &#123;
+    yesShares&#91;msg.sender&#93; &#43;&#61; msg.value;
+    totalYes &#43;&#61; msg.value;
+&#125;
+
+function resolve&#40;bool _outcome&#41; external onlyOracle &#123;
+    resolved &#61; true;
+    outcome &#61; _outcome;
+&#125;
+
+function claim&#40;&#41; external &#123;
+    require&#40;resolved, &quot;Not resolved&quot;&#41;;
+    uint256 payout;
+    if &#40;outcome&#41; &#123;
+        payout &#61; &#40;yesShares&#91;msg.sender&#93; * &#40;totalYes &#43; totalNo&#41;&#41; / totalYes;
+    &#125;
+    // Transfer payout...
+&#125;</code></pre>
+<p><strong>Use cases:</strong></p>
+<ul>
+<li><p>Election outcomes</p>
+</li>
+<li><p>Sports results</p>
+</li>
+<li><p>Scientific reproducibility &#40;&quot;Will this paper replicate?&quot;&#41;</p>
+</li>
+<li><p>Weather events</p>
+</li>
+<li><p>Any binary or categorical future event</p>
+</li>
+</ul>
+<hr />
+<h2 id="what_smart_contracts_cannot_do"><a href="#what_smart_contracts_cannot_do" class="header-anchor">What Smart Contracts <strong>Cannot</strong> Do</a></h2>
+<p>Understanding the constraints is just as important:</p>
+<table><tr><th align="right">Constraint</th><th align="right">Why</th><th align="right">Workaround</th></tr><tr><td align="right"><strong>No external I/O</strong></td><td align="right">EVM is sandboxed; can&#39;t fetch URLs, read files, call APIs</td><td align="right">Oracles &#40;Chainlink, UMA&#41; feed external data in</td></tr><tr><td align="right"><strong>No floating point</strong></td><td align="right">Determinism requires exact math across all nodes</td><td align="right">Fixed-point arithmetic &#40;multiply by \(10^{18}\), divide at the end&#41;</td></tr><tr><td align="right"><strong>No randomness</strong></td><td align="right"><code>block.timestamp</code> and <code>blockhash</code> are manipulable by miners</td><td align="right">Chainlink VRF, commit-reveal schemes</td></tr><tr><td align="right"><strong>No auto-execution</strong></td><td align="right">Contract code only runs when someone calls it</td><td align="right">Keeper networks &#40;Chainlink Keepers, Gelato&#41;</td></tr><tr><td align="right"><strong>Public state</strong></td><td align="right">All storage is readable by anyone</td><td align="right">Commit-reveal, zero-knowledge proofs, off-chain computation</td></tr><tr><td align="right"><strong>Gas limits</strong></td><td align="right">Loops can&#39;t be unbounded; computation is expensive</td><td align="right">Off-chain computation with on-chain verification</td></tr><tr><td align="right"><strong>Immutable code</strong></td><td align="right">Deployed contracts can&#39;t be modified</td><td align="right">Proxy pattern &#40;delegatecall to upgradeable logic&#41;</td></tr><tr><td align="right"><strong>No string processing</strong></td><td align="right">String ops are gas-expensive and limited</td><td align="right">Hash strings instead; process off-chain</td></tr><tr><td align="right"><strong>~12s latency</strong></td><td align="right">Transactions aren&#39;t instant</td><td align="right">Layer 2 solutions &#40;Optimism, Arbitrum&#41; for faster finality</td></tr></table>
+<hr />
+<h2 id="why_finance_came_first"><a href="#why_finance_came_first" class="header-anchor">Why Finance Came First</a></h2>
+<p>It&#39;s not an accident that DeFi dominates. Financial applications are the <strong>path of least resistance</strong> given the constraints:</p>
+<ol>
+<li><p><strong>No oracle needed</strong>: Token balances are native on-chain data. Swapping token A for token B requires no external information.</p>
+</li>
+<li><p><strong>Pure math</strong>: Interest rates, exchange rates, collateral ratios — all computable with integer arithmetic.</p>
+</li>
+<li><p><strong>High value density</strong>: Moving &#36;1M costs the same gas as moving &#36;1. The value proposition scales trivially.</p>
+</li>
+<li><p><strong>Immediate composability</strong>: One financial primitive &#40;swap&#41; feeds into another &#40;lend&#41; which feeds into another &#40;yield farm&#41;.</p>
+</li>
+<li><p><strong>Clear incentive alignment</strong>: Users are directly financially motivated to use the system correctly.</p>
+</li>
+</ol>
+<p><strong>Non-financial applications</strong> face harder problems: they need oracles &#40;supply chain&#41;, subjective judgment &#40;reputation&#41;, legal recognition &#40;identity&#41;, or privacy &#40;health data&#41;. These are solvable — but they add layers of complexity.</p>
+<hr />
+<h2 id="the_essence_distilled"><a href="#the_essence_distilled" class="header-anchor">The Essence, Distilled</a></h2>
+<p>A smart contract gives you exactly one thing: <strong>a set of rules that no single party can change or violate, enforced by cryptography and consensus.</strong></p>
+<p>From this, you can build:</p>
+\[\underbrace{\text{Tokenization}}_{\text{ownership}} + \underbrace{\text{Conditions}}_{\texttt{require}} + \underbrace{\text{Time}}_{\texttt{block.timestamp}} + \underbrace{\text{Identity}}_{\texttt{msg.sender}} + \underbrace{\text{Composability}}_{\text{contract calls}} = \text{Trustless Coordination}\]
+<p>Every application in this post is a combination of these five primitives. The constraint is always the same: the contract can only reason about data that exists on-chain. For everything else, you need an oracle — and the oracle is where trust re-enters the system.</p>
+<blockquote>
+<p><strong>The mental model:</strong> A smart contract is a <strong>vending machine</strong> — not a human clerk. It has fixed rules, accepts specific inputs, and produces deterministic outputs. It can&#39;t go check the weather or call your bank. But within its rules, it is incorruptible, tireless, and available 24/7 to anyone with an Ethereum address.</p>
+</blockquote>
+<div class="page-foot">
+    Contact me by <a href="mailto:skchu@wustl.edu">E-mail</a> | <a href="https://github.com/kchu25">Github</a> | <a href="https://www.linkedin.com/in/kchu1/">Linkedin</a>
+    <br>
+    This work is licensed under <a href="http://creativecommons.org/licenses/by-sa/4.0/">CC BY-SA 4.0</a>.  Last modified: March 01, 2026.
+    <br>
+    Website built with <a href="https://github.com/tlienart/Franklin.jl">Franklin.jl</a> and the <a href="https://julialang.org">Julia language</a>.
+</div>
+</div><!-- CONTENT ENDS HERE -->
+    
+        <script src="/libs/katex/katex.min.js"></script>
+<script src="/libs/katex/contrib/auto-render.min.js"></script>
+<script>renderMathInElement(document.body)</script>
+
+    
+    
+        <script src="/libs/highlight/highlight.min.js"></script>
+<script>
+// Register Solidity language for highlight.js
+hljs.registerLanguage('solidity', function(hljs) {
+  return {
+    keywords: {
+      keyword: 'contract interface library pragma import using struct enum event modifier function returns return require revert assert emit new delete if else for while do break continue try catch throw this super constructor fallback receive ' +
+                'public private internal external pure view payable virtual override constant immutable anonymous indexed storage memory calldata',
+      literal: 'true false wei gwei ether seconds minutes hours days weeks years',
+      built_in: 'msg block tx abi now sender value gas data origin gasprice blockhash gasleft address uint int bytes string bool mapping'
+    },
+    contains: [
+      hljs.C_LINE_COMMENT_MODE,
+      hljs.C_BLOCK_COMMENT_MODE,
+      hljs.QUOTE_STRING_MODE,
+      hljs.APOS_STRING_MODE,
+      {
+        className: 'number',
+        begin: '\\b(0[xX][a-fA-F0-9]+|(\\d+(\\.\\d*)?|\\.\\d+)([eE][-+]?\\d+)?)',
+        relevance: 0
+      },
+      {
+        className: 'type',
+        begin: '\\b(uint|int|bytes|byte|string|address|bool|ufixed|fixed)(\\d+x\\d+|\\d+)?\\b'
+      },
+      {
+        className: 'function',
+        beginKeywords: 'function modifier event constructor fallback receive',
+        end: '[{;]',
+        excludeEnd: true,
+        contains: [
+          {
+            className: 'title',
+            begin: '[A-Za-z$_][0-9A-Za-z$_]*',
+            relevance: 0
+          },
+          {
+            className: 'params',
+            begin: '\\(', end: '\\)',
+            contains: [hljs.C_LINE_COMMENT_MODE, hljs.C_BLOCK_COMMENT_MODE]
+          }
+        ]
+      }
+    ]
+  };
+});
+
+hljs.highlightAll();
+hljs.configure({tabReplace: '    '});
+</script>
+
+
+    
+  </body>
+</html>

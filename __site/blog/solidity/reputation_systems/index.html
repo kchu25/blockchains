@@ -1,0 +1,498 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@700;900&display=swap" rel="stylesheet">
+  <style>
+    @font-face {
+      font-family: 'BPdots';
+      src: url('/blockchains/assets/fonts/BPdots/BPdots.otf') format('opentype');
+      font-weight: normal;
+      font-style: normal;
+    }
+    @font-face {
+      font-family: 'BPdots';
+      src: url('/blockchains/assets/fonts/BPdots/BPdotsBold.otf') format('opentype');
+      font-weight: bold;
+      font-style: normal;
+    }
+  </style>
+  
+   <link rel="stylesheet" href="/libs/highlight/styles/atom-one-dark.min.css">
+   
+  <link rel="stylesheet" href="/css/franklin.css">
+<link rel="stylesheet" href="/css/hypertext.css">
+<link rel="icon" href="/assets/favicon.png">
+
+   <title>On-Chain Reputation: Beyond Lending and DeFi</title>  
+</head>
+<body>
+<header>
+  <h1 style="color:#283747; font-family:'BPdots', monospace; font-size:2.5em; font-weight:normal; letter-spacing:0.1em">blockchains</h1>
+  <nav>
+    <a href="/" class="current">Tags</a>
+  | <a href="/blog/" >Notes</a>
+  <hr/>
+  </nav>
+</header>
+
+
+<!-- Content appended here -->
+<div class="franklin-content"><h1 id="on-chain_reputation_beyond_lending_and_defi"><a href="#on-chain_reputation_beyond_lending_and_defi" class="header-anchor">On-Chain Reputation: Beyond Lending and DeFi</a></h1>
+<blockquote>
+<p><strong>The Core Insight</strong>: Smart contracts aren&#39;t just financial ledgers. They&#39;re <strong>trust machines</strong> that record verifiable actions on-chain. A reputation system is a contract that:</p>
+<ol>
+<li><p><strong>Records events</strong> &#40;user completes task, seller ships goods, reviewer validates claim&#41;</p>
+</li>
+<li><p><strong>Computes metrics</strong> &#40;score, badge, leaderboard&#41; from those events</p>
+</li>
+<li><p><strong>Exposes data</strong> via a public interface for any web app to query</p>
+</li>
+</ol>
+<p>No centralized database. No moderator needed. No single point of failure. Third parties are automated away.</p>
+</blockquote>
+<hr />
+<h2 id="why_on-chain_reputation"><a href="#why_on-chain_reputation" class="header-anchor">Why On-Chain Reputation?</a></h2>
+<p><strong>Traditional systems:</strong></p>
+<ul>
+<li><p>Yelp/Amazon: centralized database, can delete reviews, takes 30&#37; commission</p>
+</li>
+<li><p>LinkedIn: you don&#39;t own your profile; they control your reputation</p>
+</li>
+<li><p>eBay: they decide dispute outcomes, can ban you without appeal</p>
+</li>
+</ul>
+<p><strong>On-Chain:</strong></p>
+<ul>
+<li><p>Immutable ledger of actions &#40;permanent, public, verifiable&#41;</p>
+</li>
+<li><p>Transparent calculation &#40;you can audit the scoring formula&#41;</p>
+</li>
+<li><p>Composable &#40;other contracts can read your score and react&#41;</p>
+</li>
+<li><p>Decentralized &#40;anyone can build a UI on top of the same data&#41;</p>
+</li>
+</ul>
+<hr />
+<h2 id="simple_example_task_completion_reputation"><a href="#simple_example_task_completion_reputation" class="header-anchor">Simple Example: Task Completion Reputation</a></h2>
+<p>Imagine a gig marketplace. Instead of Fiverr &#40;centralized&#41;, users build reputation through completed work tracked on-chain.</p>
+<h3 id="contract_structure"><a href="#contract_structure" class="header-anchor">Contract Structure</a></h3>
+<pre><code class="language-solidity">pragma solidity ^0.8.24;
+
+contract TaskReputation &#123;
+    // Event: Task completed
+    event TaskCompleted&#40;
+        address indexed worker,
+        uint256 taskId,
+        uint256 timestamp,
+        uint256 amount
+    &#41;;
+
+    // Event: Review posted
+    event ReviewPosted&#40;
+        address indexed reviewer,
+        address indexed worker,
+        uint256 taskId,
+        uint8 rating,  // 1-5 stars
+        string feedback
+    &#41;;
+
+    // Struct: Task
+    struct Task &#123;
+        address requester;
+        address worker;
+        uint256 amount;
+        bool completed;
+        uint8 rating;
+    &#125;
+
+    // Struct: Reputation
+    struct ReputationMetrics &#123;
+        uint256 tasksCompleted;
+        uint256 totalEarned;
+        uint8 avgRating;  // 1-5, stored as uint8
+        uint256 reviewCount;
+    &#125;
+
+    // Storage
+    mapping&#40;uint256 &#61;&gt; Task&#41; public tasks;
+    mapping&#40;address &#61;&gt; ReputationMetrics&#41; public reputation;
+    mapping&#40;address &#61;&gt; uint8&#91;&#93;&#41; public ratings;  // All ratings for a worker
+    
+    uint256 nextTaskId &#61; 0;
+
+    // Create task
+    function createTask&#40;address worker, uint256 amount&#41; external payable &#123;
+        require&#40;msg.value &gt;&#61; amount, &quot;Insufficient payment&quot;&#41;;
+        
+        tasks&#91;nextTaskId&#93; &#61; Task&#40;&#123;
+            requester: msg.sender,
+            worker: worker,
+            amount: amount,
+            completed: false,
+            rating: 0
+        &#125;&#41;;
+        
+        nextTaskId&#43;&#43;;
+    &#125;
+
+    // Worker completes task
+    function completeTask&#40;uint256 taskId&#41; external &#123;
+        Task storage task &#61; tasks&#91;taskId&#93;;
+        require&#40;msg.sender &#61;&#61; task.worker, &quot;Not task worker&quot;&#41;;
+        require&#40;&#33;task.completed, &quot;Already completed&quot;&#41;;
+        
+        task.completed &#61; true;
+        
+        // Update reputation
+        reputation&#91;msg.sender&#93;.tasksCompleted &#43;&#61; 1;
+        reputation&#91;msg.sender&#93;.totalEarned &#43;&#61; task.amount;
+        
+        // Transfer payment
+        payable&#40;msg.sender&#41;.transfer&#40;task.amount&#41;;
+        
+        emit TaskCompleted&#40;msg.sender, taskId, block.timestamp, task.amount&#41;;
+    &#125;
+
+    // Requester rates completed task
+    function rateTask&#40;uint256 taskId, uint8 rating&#41; external &#123;
+        Task storage task &#61; tasks&#91;taskId&#93;;
+        require&#40;msg.sender &#61;&#61; task.requester, &quot;Not requester&quot;&#41;;
+        require&#40;task.completed, &quot;Task not completed&quot;&#41;;
+        require&#40;rating &gt;&#61; 1 &amp;&amp; rating &lt;&#61; 5, &quot;Rating 1-5 only&quot;&#41;;
+        
+        task.rating &#61; rating;
+        
+        // Update worker reputation
+        address worker &#61; task.worker;
+        ratings&#91;worker&#93;.push&#40;rating&#41;;
+        
+        uint256 sum &#61; 0;
+        for &#40;uint256 i &#61; 0; i &lt; ratings&#91;worker&#93;.length; i&#43;&#43;&#41; &#123;
+            sum &#43;&#61; ratings&#91;worker&#93;&#91;i&#93;;
+        &#125;
+        reputation&#91;worker&#93;.avgRating &#61; uint8&#40;sum / ratings&#91;worker&#93;.length&#41;;
+        reputation&#91;worker&#93;.reviewCount &#61; ratings&#91;worker&#93;.length;
+        
+        emit ReviewPosted&#40;msg.sender, worker, taskId, rating, &quot;&quot;&#41;;
+    &#125;
+
+    // Query reputation &#40;public, anyone can call&#41;
+    function getReputation&#40;address worker&#41; 
+        external 
+        view 
+        returns &#40;ReputationMetrics memory&#41; 
+    &#123;
+        return reputation&#91;worker&#93;;
+    &#125;
+
+    // Get all ratings for a worker
+    function getRatings&#40;address worker&#41; 
+        external 
+        view 
+        returns &#40;uint8&#91;&#93; memory&#41; 
+    &#123;
+        return ratings&#91;worker&#93;;
+    &#125;
+&#125;</code></pre>
+<h3 id="how_a_web_app_uses_this"><a href="#how_a_web_app_uses_this" class="header-anchor">How a Web App Uses This</a></h3>
+<pre><code class="language-javascript">// Fetch worker reputation from blockchain
+const workerAddress &#61; &quot;0x1234...&quot;;
+const contract &#61; new ethers.Contract&#40;
+  REPUTATION_CONTRACT_ADDRESS,
+  CONTRACT_ABI,
+  provider
+&#41;;
+
+const metrics &#61; await contract.getReputation&#40;workerAddress&#41;;
+
+// Display on website
+document.querySelector&#40;&quot;#tasks-completed&quot;&#41;.textContent &#61; metrics.tasksCompleted;
+document.querySelector&#40;&quot;#avg-rating&quot;&#41;.textContent &#61; 
+  &#40;metrics.avgRating / 10&#41;.toFixed&#40;1&#41; &#43; &quot;/5&quot;;
+document.querySelector&#40;&quot;#total-earned&quot;&#41;.textContent &#61; 
+  ethers.formatEther&#40;metrics.totalEarned&#41; &#43; &quot; ETH&quot;;</code></pre>
+<p>The web app doesn&#39;t store anything. It <strong>queries</strong> the contract in real-time. Multiple web apps can exist, all showing the same trustworthy data.</p>
+<hr />
+<h2 id="more_complex_staking-based_reputation"><a href="#more_complex_staking-based_reputation" class="header-anchor">More Complex: Staking-Based Reputation</a></h2>
+<p>What if users can <strong>stake</strong> to earn reputation? Higher stake &#61; higher reputation &#40;assuming you have skin in the game&#41;.</p>
+<pre><code class="language-solidity">pragma solidity ^0.8.24;
+
+contract StakedReputation &#123;
+    mapping&#40;address &#61;&gt; uint256&#41; public staked;
+    mapping&#40;address &#61;&gt; uint256&#41; public reputation;
+
+    // Stake ETH to participate
+    function stake&#40;&#41; external payable &#123;
+        require&#40;msg.value &gt; 0, &quot;Stake &gt; 0&quot;&#41;;
+        staked&#91;msg.sender&#93; &#43;&#61; msg.value;
+        reputation&#91;msg.sender&#93; &#43;&#61; msg.value;  // 1 wei staked &#61; 1 rep
+    &#125;
+
+    // Unstake &#40;only if in good standing&#41;
+    function unstake&#40;uint256 amount&#41; external &#123;
+        require&#40;staked&#91;msg.sender&#93; &gt;&#61; amount, &quot;Insufficient stake&quot;&#41;;
+        staked&#91;msg.sender&#93; -&#61; amount;
+        payable&#40;msg.sender&#41;.transfer&#40;amount&#41;;
+    &#125;
+
+    // Slashing &#40;external oracle or DAO votes to penalize&#41;
+    function slash&#40;address user, uint256 amount&#41; external onlyOracle &#123;
+        reputation&#91;user&#93; &#61; &#40;reputation&#91;user&#93; &gt; amount&#41; 
+            ? reputation&#91;user&#93; - amount 
+            : 0;
+        staked&#91;user&#93; &#61; &#40;staked&#91;user&#93; &gt; amount&#41; 
+            ? staked&#91;user&#93; - amount 
+            : 0;
+    &#125;
+
+    function getReputation&#40;address user&#41; 
+        external 
+        view 
+        returns &#40;uint256&#41; 
+    &#123;
+        return reputation&#91;user&#93;;
+    &#125;
+&#125;</code></pre>
+<p><strong>Use case:</strong> Network participants &#40;validators, curators, content reviewers&#41; stake to earn the right to participate. Misbehavior → slash → reputation drop.</p>
+<hr />
+<h2 id="real-world_examples"><a href="#real-world_examples" class="header-anchor">Real-World Examples</a></h2>
+<h3 id="desci_reputation_decentralized_science"><a href="#desci_reputation_decentralized_science" class="header-anchor"><ol>
+<li><p><strong>DeSci Reputation</strong> &#40;Decentralized Science&#41;</p>
+</li>
+</ol>
+</a></h3>
+<ul>
+<li><p>Researchers publish findings on-chain &#40;IPFS hash &#43; metadata&#41;</p>
+</li>
+<li><p>Peer reviewers stake tokens to validate papers</p>
+</li>
+<li><p>Reviews recorded on-chain; reviewer builds reputation</p>
+</li>
+<li><p>High-reputation reviewers&#39; endorsements carry more weight</p>
+</li>
+<li><p>Funding decisions weighted by reputation</p>
+</li>
+</ul>
+<h3 id="ol_start2_marketplace_trust_opensea_for_services"><a href="#ol_start2_marketplace_trust_opensea_for_services" class="header-anchor"><ol start="2">
+<li><p><strong>Marketplace Trust</strong> &#40;Opensea for Services&#41;</p>
+</li>
+</ol>
+</a></h3>
+<ul>
+<li><p>Freelancer: posts availability, completes jobs, gets rated</p>
+</li>
+<li><p>Client: posts budget, rates work, earns reputation for fair dealing</p>
+</li>
+<li><p>Both sides&#39; histories are <strong>transparent and immutable</strong></p>
+</li>
+<li><p>Third-party arbiters &#40;DAO members&#41; can dispute and slash bad actors</p>
+</li>
+</ul>
+<h3 id="ol_start3_dao_voting_power"><a href="#ol_start3_dao_voting_power" class="header-anchor"><ol start="3">
+<li><p><strong>DAO Voting Power</strong></p>
+</li>
+</ol>
+</a></h3>
+<ul>
+<li><p>Reputation ≠ token holding. Reputation &#61; past contributions &#40;work, tests, reviews&#41;</p>
+</li>
+<li><p>DAO members earn voting power by doing work, not by buying tokens</p>
+</li>
+<li><p>Whale with 1M tokens but no contributions &#61; no voting power</p>
+</li>
+<li><p>Small contributor with 100 tasks completed &#61; more voting power</p>
+</li>
+</ul>
+<h3 id="ol_start4_on-chain_certification"><a href="#ol_start4_on-chain_certification" class="header-anchor"><ol start="4">
+<li><p><strong>On-Chain Certification</strong></p>
+</li>
+</ol>
+</a></h3>
+<ul>
+<li><p>Platform issues <strong>SBT &#40;Soulbound Token&#41;</strong> for completed course modules</p>
+</li>
+<li><p>Each SBT logs difficulty level, completion date, test score</p>
+</li>
+<li><p>Employer queries: &quot;Does this developer have 5 SBTs in cryptography?&quot;</p>
+</li>
+<li><p>No centralized credential database; credential is a token you own</p>
+</li>
+</ul>
+<hr />
+<h2 id="key_design_decisions"><a href="#key_design_decisions" class="header-anchor">Key Design Decisions</a></h2>
+<h3 id="storage_vs_immutability"><a href="#storage_vs_immutability" class="header-anchor">Storage vs. Immutability</a></h3>
+<p><strong>Option 1: Store all history</strong></p>
+<pre><code class="language-solidity">mapping&#40;address &#61;&gt; Event&#91;&#93;&#41; public history;  // Every action ever</code></pre>
+<p>Pros: Transparent, auditable, composable   Cons: Gas expensive, storage bloat</p>
+<p><strong>Option 2: Store only aggregates</strong></p>
+<pre><code class="language-solidity">mapping&#40;address &#61;&gt; uint256&#41; public totalTasks;
+mapping&#40;address &#61;&gt; uint256&#41; public avgRating;</code></pre>
+<p>Pros: Cheap, efficient   Cons: Can&#39;t audit the historical record; have to trust the aggregation logic</p>
+<p><strong>Hybrid:</strong> Emit events &#40;logged on-chain, queryable but cheaper&#41; &#43; store aggregates.</p>
+<h3 id="who_can_update_reputation"><a href="#who_can_update_reputation" class="header-anchor">Who Can Update Reputation?</a></h3>
+<p><strong>Centralized &#40;single oracle&#41;:</strong></p>
+<pre><code class="language-solidity">function updateReputation&#40;address user, uint256 newScore&#41; external onlyOwner &#123;&#125;</code></pre>
+<p>Fast, cheap. But defeats the purpose—you&#39;re trusting the owner.</p>
+<p><strong>Decentralized &#40;DAO votes or multiple oracles&#41;:</strong></p>
+<pre><code class="language-solidity">function updateReputation&#40;address user, uint256 newScore&#41; external &#123;
+    require&#40;hasMultiSigApproval&#40;&#41;, &quot;Need 3-of-5 approval&quot;&#41;;
+&#125;</code></pre>
+<p>Trustless but slow and complex.</p>
+<p><strong>Peer-driven &#40;anyone can report, but with stake&#41;:</strong></p>
+<pre><code class="language-solidity">function challenge&#40;address user&#41; external payable &#123;
+    require&#40;msg.value &gt; minBond, &quot;Post bond&quot;&#41;;
+    // DAO votes; loser loses bond
+&#125;</code></pre>
+<p>Incentive-compatible, decentralized.</p>
+<h3 id="temporal_decay"><a href="#temporal_decay" class="header-anchor">Temporal Decay</a></h3>
+<p>Reputation from 5 years ago shouldn&#39;t count as much as last month. But Solidity can&#39;t trigger time-based updates automatically. Options:</p>
+<ol>
+<li><p><strong>Off-chain compute</strong>: Web3.js fetches history, computes decayed score, displays it</p>
+</li>
+<li><p><strong>On-demand decay</strong>: User calls <code>updateReputation&#40;&#41;</code>, contract recalculates with decay</p>
+</li>
+<li><p><strong>Staking decay</strong>: Reputation decreases if you stop staking</p>
+</li>
+</ol>
+<hr />
+<h2 id="connecting_to_web_apps"><a href="#connecting_to_web_apps" class="header-anchor">Connecting to Web Apps</a></h2>
+<h3 id="the_architecture"><a href="#the_architecture" class="header-anchor">The Architecture</a></h3>
+<pre><code class="language-julia">┌─────────────────┐
+│  Smart Contract │ ← Records all reputation events
+│  &#40;on Ethereum&#41;  │   &#40;immutable, public&#41;
+└────────┬────────┘
+         │ Events emitted
+         ├─→ Indexer &#40;The Graph, Alchemy&#41;
+         │   Listens to blockchain, stores in queryable database
+         │
+         ├─→ Web App Backend
+             ├─ Queries indexer for historical data
+             ├─ Caches computed metrics
+             └─ Serves REST API to frontend
+         │
+         └─→ Frontend &#40;React/Vue&#41;
+             ├─ Fetches live metrics from backend
+             ├─ Or queries contract directly &#40;slow&#41;
+             └─ Displays leaderboards, profiles, ratings</code></pre>
+<h3 id="example_the_graph_query"><a href="#example_the_graph_query" class="header-anchor">Example: The Graph Query</a></h3>
+<pre><code class="language-graphql">&#123;
+  workers&#40;first: 10, orderBy: reputation, orderDirection: desc&#41; &#123;
+    id
+    tasksCompleted
+    avgRating
+    totalEarned
+  &#125;
+&#125;</code></pre>
+<p>The Graph automatically indexes your contract&#39;s events and provides GraphQL queries. Your web app doesn&#39;t need to understand Solidity; it just queries like any API.</p>
+<hr />
+<h2 id="why_this_matters"><a href="#why_this_matters" class="header-anchor">Why This Matters</a></h2>
+<p>Traditional systems:</p>
+<ul>
+<li><p><strong>Single point of failure</strong>: Platform goes down → reputation gone</p>
+</li>
+<li><p><strong>Rent extraction</strong>: Intermediary takes 30&#37; because they control the trust layer</p>
+</li>
+<li><p><strong>Censorship</strong>: They can delete your account or reviews</p>
+</li>
+<li><p><strong>Data lock-in</strong>: Your reputation can&#39;t move to another platform</p>
+</li>
+</ul>
+<p>On-chain reputation:</p>
+<ul>
+<li><p><strong>Portable</strong>: Your reputation exists independently of any platform</p>
+</li>
+<li><p><strong>Composable</strong>: Any contract can read it; any website can display it</p>
+</li>
+<li><p><strong>Permanent</strong>: Can&#39;t be deleted &#40;though it can decay&#41;</p>
+</li>
+<li><p><strong>Transparent</strong>: Calculation is verifiable code, not a black-box algorithm</p>
+</li>
+</ul>
+<p>The power isn&#39;t in payments &#40;DeFi can handle that&#41;. The power is in <strong>trustless coordination</strong>: systems where participants can verify each other&#39;s track records without needing a central authority to mediate.</p>
+<hr />
+<h2 id="gotchas"><a href="#gotchas" class="header-anchor">Gotchas</a></h2>
+<ol>
+<li><p><strong>Oracle problem</strong>: Who feeds in real-world data? If your metric depends on &quot;was the work actually good?&quot;, you need off-chain judges. Smart contracts alone can&#39;t judge subjective quality.</p>
+</li>
+<li><p><strong>Sybil attacks</strong>: Without cost, anyone can create 1000 accounts and fake reputation. Mitigate with staking &#40;cost to participate&#41; or SBTs &#40;hard to forge&#41;.</p>
+</li>
+<li><p><strong>Gas costs</strong>: Storing all history is expensive. Aggregate and use events instead.</p>
+</li>
+<li><p><strong>Immutability</strong>: Once bad data is on-chain, it&#39;s permanent. Be careful with initialization.</p>
+</li>
+<li><p><strong>Privacy</strong>: All reputation is public. Anonymity and reputation are in tension.</p>
+</li>
+</ol>
+<hr />
+<h2 id="conclusion"><a href="#conclusion" class="header-anchor">Conclusion</a></h2>
+<p>Smart contracts enable <strong>decentralized reputation</strong>: a trustworthy record of actions without intermediaries. Not just for lending. For marketplaces, certification, voting power, community trust, scientific peer review, and any system that currently relies on a centralized authority to maintain credibility.</p>
+<p>The contract is the database. The web app is the UI. Both are decoupled.</p>
+<div class="page-foot">
+    Contact me by <a href="mailto:skchu@wustl.edu">E-mail</a> | <a href="https://github.com/kchu25">Github</a> | <a href="https://www.linkedin.com/in/kchu1/">Linkedin</a>
+    <br>
+    This work is licensed under <a href="http://creativecommons.org/licenses/by-sa/4.0/">CC BY-SA 4.0</a>.  Last modified: March 01, 2026.
+    <br>
+    Website built with <a href="https://github.com/tlienart/Franklin.jl">Franklin.jl</a> and the <a href="https://julialang.org">Julia language</a>.
+</div>
+</div><!-- CONTENT ENDS HERE -->
+    
+    
+        <script src="/libs/highlight/highlight.min.js"></script>
+<script>
+// Register Solidity language for highlight.js
+hljs.registerLanguage('solidity', function(hljs) {
+  return {
+    keywords: {
+      keyword: 'contract interface library pragma import using struct enum event modifier function returns return require revert assert emit new delete if else for while do break continue try catch throw this super constructor fallback receive ' +
+                'public private internal external pure view payable virtual override constant immutable anonymous indexed storage memory calldata',
+      literal: 'true false wei gwei ether seconds minutes hours days weeks years',
+      built_in: 'msg block tx abi now sender value gas data origin gasprice blockhash gasleft address uint int bytes string bool mapping'
+    },
+    contains: [
+      hljs.C_LINE_COMMENT_MODE,
+      hljs.C_BLOCK_COMMENT_MODE,
+      hljs.QUOTE_STRING_MODE,
+      hljs.APOS_STRING_MODE,
+      {
+        className: 'number',
+        begin: '\\b(0[xX][a-fA-F0-9]+|(\\d+(\\.\\d*)?|\\.\\d+)([eE][-+]?\\d+)?)',
+        relevance: 0
+      },
+      {
+        className: 'type',
+        begin: '\\b(uint|int|bytes|byte|string|address|bool|ufixed|fixed)(\\d+x\\d+|\\d+)?\\b'
+      },
+      {
+        className: 'function',
+        beginKeywords: 'function modifier event constructor fallback receive',
+        end: '[{;]',
+        excludeEnd: true,
+        contains: [
+          {
+            className: 'title',
+            begin: '[A-Za-z$_][0-9A-Za-z$_]*',
+            relevance: 0
+          },
+          {
+            className: 'params',
+            begin: '\\(', end: '\\)',
+            contains: [hljs.C_LINE_COMMENT_MODE, hljs.C_BLOCK_COMMENT_MODE]
+          }
+        ]
+      }
+    ]
+  };
+});
+
+hljs.highlightAll();
+hljs.configure({tabReplace: '    '});
+</script>
+
+
+    
+  </body>
+</html>

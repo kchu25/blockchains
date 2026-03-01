@@ -73,6 +73,7 @@
 <p>Solidity&#39;s primitive types form a finite, ordered set of values. Each has a fixed size &#40;in bits&#41; and semantics &#40;how operations work on them&#41;.</p>
 <h4 id="unsigned_integers"><a href="#unsigned_integers" class="header-anchor">Unsigned Integers</a></h4>
 \[\text{uint}\langle n \rangle : n \in \{8, 16, 32, \ldots, 256\}, n \equiv 0 \pmod{8}\]
+<p>&#40;Read: \(n\) is divisible by 8, i.e., a multiple of 8: 8, 16, 24, ..., 256 bits&#41;</p>
 <p>Maps to integers \(\{0, 1, \ldots, 2^n - 1\}\).</p>
 <pre><code class="language-solidity">uint8 small &#61; 255;        // Range: &#91;0, 255&#93;
 uint256 large &#61; 2**256-1; // Range: &#91;0, 2^256 - 1&#93;
@@ -82,6 +83,7 @@ uint x &#61; 5;               // uint ≡ uint256 &#40;default&#41;</code></pre>
 x &#43;&#61; 1;  // Reverts&#33; &#40;255 &#43; 1 &gt; 255&#41;</code></pre>
 <h4 id="signed_integers"><a href="#signed_integers" class="header-anchor">Signed Integers</a></h4>
 \[\text{int}\langle n \rangle : n \in \{8, 16, 32, \ldots, 256\}, n \equiv 0 \pmod{8}\]
+<p>&#40;Read: \(n\) is divisible by 8&#41;</p>
 <p>Maps to integers \(\{-2^{n-1}, \ldots, -1, 0, 1, \ldots, 2^{n-1} - 1\}\).</p>
 <pre><code class="language-solidity">int8 x &#61; -128;   // Range: &#91;-128, 127&#93;
 int256 y &#61; -1;</code></pre>
@@ -210,6 +212,34 @@ address deployer &#61; msg.sender; // Set at deploy time &#40;constructor runs&#
 <hr />
 <h2 id="part_4_functionsthe_transition_function_mathcalt"><a href="#part_4_functionsthe_transition_function_mathcalt" class="header-anchor">Part 4: Functions—The Transition Function \(\mathcal{T}\)</a></h2>
 <p>A function defines how state changes in response to a call.</p>
+<blockquote>
+<p><strong>How does a dApp trigger a function call?</strong></p>
+<ol>
+<li><p><strong>User clicks a button in the React app</strong> &#40;e.g., &quot;Withdraw 1 ETH&quot;&#41;</p>
+</li>
+<li><p><strong>dApp frontend creates a transaction</strong> using ethers.js or Web3.js:</p>
+</li>
+</ol>
+</blockquote>
+<pre><code class="language-javascript">&gt;    const tx &#61; await contract.withdraw&#40;ethers.parseEther&#40;&quot;1&quot;&#41;&#41;;
+&gt;</code></pre>
+<blockquote>
+<ol start="3">
+<li><p><strong>User signs the transaction</strong> with MetaMask &#40;or Ledger, etc.&#41;</p>
+</li>
+<li><p><strong>Transaction is sent to the blockchain</strong> &#40;JSON-RPC to an Ethereum node&#41;</p>
+</li>
+<li><p><strong>Miners/validators include it in a block</strong> &#40;usually within seconds&#41;</p>
+</li>
+<li><p><strong>EVM executes the contract function</strong> with your signed message</p>
+</li>
+<li><p><strong>State updates</strong> &#40;your balance decreases, the contract&#39;s balance decreases&#41;</p>
+</li>
+<li><p><strong>dApp listens for the block confirmation</strong> and updates the UI</p>
+</li>
+</ol>
+<p><strong>Key point:</strong> You&#39;re not &quot;calling&quot; the function directly like <code>contract.withdraw&#40;&#41;</code> in Node.js. You&#39;re signing a <strong>transaction</strong> that tells the blockchain &quot;execute this function with these arguments.&quot; The blockchain then executes it deterministically on every node. This is why it costs gas and takes 12&#43; seconds.</p>
+</blockquote>
 <h3 id="basic_syntax"><a href="#basic_syntax" class="header-anchor">Basic Syntax</a></h3>
 <pre><code class="language-solidity">function myFunction&#40;uint256 x, address to&#41; public returns &#40;uint256, bool&#41; &#123;
     // Function body
@@ -218,23 +248,30 @@ address deployer &#61; msg.sender; // Set at deploy time &#40;constructor runs&#
 <p><strong>Signature:</strong> \((T_1, T_2, \ldots, T_k) \to (R_1, R_2, \ldots, R_m)\)</p>
 <p>where \(T_i\) are parameter types and \(R_j\) are return types.</p>
 <h3 id="visibility_modifiers"><a href="#visibility_modifiers" class="header-anchor">Visibility Modifiers</a></h3>
-<ul>
-<li><p><strong><code>public</code></strong> — callable from outside, within contract, by subcontracts. Generates external interface.</p>
-</li>
-<li><p><strong><code>internal</code></strong> — callable only within contract and subcontracts.</p>
-</li>
-<li><p><strong><code>external</code></strong> — callable only from outside &#40;not from within&#41;. Cheaper gas if called externally.</p>
-</li>
-<li><p><strong><code>private</code></strong> — callable only within this contract.</p>
-</li>
-</ul>
-<pre><code class="language-solidity">contract Visibility &#123;
-    function pub&#40;&#41; public &#123; &#125;            // Can call: anywhere
-    function ext&#40;&#41; external &#123; &#125;          // Can call: from outside only
-    function int&#40;&#41; internal &#123; &#125;          // Can call: within contract
-    function priv&#40;&#41; private &#123; &#125;          // Can call: this contract only
-&#125;</code></pre>
-<p><strong>When to use <code>external</code>?</strong> When a function is never called internally. It&#39;s cheaper for external callers.</p>
+<p>The <strong>four levels</strong> control where a function can be called from:</p>
+<table><tr><th align="right">Modifier</th><th align="right">Outside</th><th align="right">Within Contract</th><th align="right">Subcontracts</th><th align="right">Generates External Interface</th></tr><tr><td align="right"><strong><code>public</code></strong></td><td align="right">✓</td><td align="right">✓</td><td align="right">✓</td><td align="right">Yes &#40;auto getter&#41;</td></tr><tr><td align="right"><strong><code>internal</code></strong></td><td align="right">✗</td><td align="right">✓</td><td align="right">✓</td><td align="right">No</td></tr><tr><td align="right"><strong><code>external</code></strong></td><td align="right">✓</td><td align="right">✗</td><td align="right">✗</td><td align="right">Yes</td></tr><tr><td align="right"><strong><code>private</code></strong></td><td align="right">✗</td><td align="right">✓</td><td align="right">✗</td><td align="right">No</td></tr></table>
+<p><strong>Outside</strong> &#61; external callers &#40;off-chain, other contracts&#41;   <strong>Within Contract</strong> &#61; same contract&#39;s methods   <strong>Subcontracts</strong> &#61; contracts inheriting from this one</p>
+<pre><code class="language-solidity">contract Base &#123;
+    function pub&#40;&#41; public &#123; &#125;           // Anywhere
+    function ext&#40;&#41; external &#123; &#125;         // Outside only
+    function int&#40;&#41; internal &#123; &#125;         // Base &#43; subcontracts only
+    function priv&#40;&#41; private &#123; &#125;         // Base only
+&#125;
+
+contract Derived is Base &#123;
+    function test&#40;&#41; public &#123;
+        // pub&#40;&#41;;      ✓ Can call public
+        // int&#40;&#41;;      ✓ Can call internal &#40;inherited&#41;
+        // priv&#40;&#41;;     ✗ Cannot call private &#40;not inherited&#41;
+        // ext&#40;&#41;;      ✗ Cannot call external &#40;contract boundary only&#41;
+    &#125;
+&#125;
+
+// External caller:
+// base.pub&#40;&#41;      ✓ OK
+// base.ext&#40;&#41;      ✓ OK
+// base.int&#40;&#41;      ✗ Error &#40;private to contract&#41;</code></pre>
+<p><strong>Gas tip:</strong> Use <code>external</code> for functions never called internally—cheaper than <code>public</code>.</p>
 <h3 id="state-modifying_functions"><a href="#state-modifying_functions" class="header-anchor">State-Modifying Functions</a></h3>
 <p>A function that changes state:</p>
 <pre><code class="language-solidity">function increment&#40;&#41; public &#123;
@@ -443,6 +480,20 @@ function withdraw&#40;uint256 amount&#41; public &#123;
 &#125;</code></pre>
 <hr />
 <h2 id="part_12_contract_inheritance"><a href="#part_12_contract_inheritance" class="header-anchor">Part 12: Contract Inheritance</a></h2>
+<blockquote>
+<p><strong>When is inheritance used?</strong> Inheritance is <strong>very common</strong> in Solidity for code reuse:</p>
+<ul>
+<li><p><strong>Token standards</strong>: <code>ERC20</code>, <code>ERC721</code>, <code>ERC1155</code> &#40;OpenZeppelin contracts&#41;. Your token inherits from <code>ERC20</code> to reuse transfer logic, balance tracking, approvals.</p>
+</li>
+<li><p><strong>Access control</strong>: Base contracts like <code>Ownable</code> &#40;one owner&#41; or <code>AccessControl</code> &#40;role-based&#41; that derived contracts inherit from.</p>
+</li>
+<li><p><strong>Upgradeable proxies</strong>: <code>UUPSUpgradeable</code>, <code>TransparentProxy</code> — derived contracts extend base proxy logic.</p>
+</li>
+<li><p><strong>Shared utilities</strong>: Common functions &#40;e.g., <code>safe math operations</code>, <code>event logging</code>, <code>validation</code>&#41; live in base contracts; derived contracts focus on domain logic.</p>
+</li>
+</ul>
+<p><strong>Rule of thumb</strong>: If you&#39;re writing a token, use inheritance. If you&#39;re writing access rules, use inheritance. Most real contracts are derived contracts, not base contracts.</p>
+</blockquote>
 <p>Contracts can inherit from other contracts:</p>
 <pre><code class="language-solidity">contract Base &#123;
     uint256 public x &#61; 10;

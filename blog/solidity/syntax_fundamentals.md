@@ -47,6 +47,8 @@ Solidity's primitive types form a finite, ordered set of values. Each has a fixe
 
 $$\text{uint}\langle n \rangle : n \in \{8, 16, 32, \ldots, 256\}, n \equiv 0 \pmod{8}$$
 
+(Read: $n$ is divisible by 8, i.e., a multiple of 8: 8, 16, 24, ..., 256 bits)
+
 Maps to integers $\{0, 1, \ldots, 2^n - 1\}$.
 
 ```solidity
@@ -65,6 +67,8 @@ x += 1;  // Reverts! (255 + 1 > 255)
 #### Signed Integers
 
 $$\text{int}\langle n \rangle : n \in \{8, 16, 32, \ldots, 256\}, n \equiv 0 \pmod{8}$$
+
+(Read: $n$ is divisible by 8)
 
 Maps to integers $\{-2^{n-1}, \ldots, -1, 0, 1, \ldots, 2^{n-1} - 1\}$.
 
@@ -267,6 +271,22 @@ Uninitialized state variables get the **zero value** of their type:
 
 A function defines how state changes in response to a call.
 
+> **How does a dApp trigger a function call?**
+> 
+> 1. **User clicks a button in the React app** (e.g., "Withdraw 1 ETH")
+> 2. **dApp frontend creates a transaction** using ethers.js or Web3.js:
+>    ```javascript
+>    const tx = await contract.withdraw(ethers.parseEther("1"));
+>    ```
+> 3. **User signs the transaction** with MetaMask (or Ledger, etc.)
+> 4. **Transaction is sent to the blockchain** (JSON-RPC to an Ethereum node)
+> 5. **Miners/validators include it in a block** (usually within seconds)
+> 6. **EVM executes the contract function** with your signed message
+> 7. **State updates** (your balance decreases, the contract's balance decreases)
+> 8. **dApp listens for the block confirmation** and updates the UI
+>
+> **Key point:** You're not "calling" the function directly like `contract.withdraw()` in Node.js. You're signing a **transaction** that tells the blockchain "execute this function with these arguments." The blockchain then executes it deterministically on every node. This is why it costs gas and takes 12+ seconds.
+
 ### Basic Syntax
 
 ```solidity
@@ -282,21 +302,43 @@ where $T_i$ are parameter types and $R_j$ are return types.
 
 ### Visibility Modifiers
 
-- **`public`** — callable from outside, within contract, by subcontracts. Generates external interface.
-- **`internal`** — callable only within contract and subcontracts.
-- **`external`** — callable only from outside (not from within). Cheaper gas if called externally.
-- **`private`** — callable only within this contract.
+The **four levels** control where a function can be called from:
+
+| Modifier | Outside | Within Contract | Subcontracts | Generates External Interface |
+|----------|---------|-----------------|--------------|------|
+| **`public`** | ✓ | ✓ | ✓ | Yes (auto getter) |
+| **`internal`** | ✗ | ✓ | ✓ | No |
+| **`external`** | ✓ | ✗ | ✗ | Yes |
+| **`private`** | ✗ | ✓ | ✗ | No |
+
+**Outside** = external callers (off-chain, other contracts)  
+**Within Contract** = same contract's methods  
+**Subcontracts** = contracts inheriting from this one
 
 ```solidity
-contract Visibility {
-    function pub() public { }            // Can call: anywhere
-    function ext() external { }          // Can call: from outside only
-    function int() internal { }          // Can call: within contract
-    function priv() private { }          // Can call: this contract only
+contract Base {
+    function pub() public { }           // Anywhere
+    function ext() external { }         // Outside only
+    function int() internal { }         // Base + subcontracts only
+    function priv() private { }         // Base only
 }
+
+contract Derived is Base {
+    function test() public {
+        // pub();      ✓ Can call public
+        // int();      ✓ Can call internal (inherited)
+        // priv();     ✗ Cannot call private (not inherited)
+        // ext();      ✗ Cannot call external (contract boundary only)
+    }
+}
+
+// External caller:
+// base.pub()      ✓ OK
+// base.ext()      ✓ OK
+// base.int()      ✗ Error (private to contract)
 ```
 
-**When to use `external`?** When a function is never called internally. It's cheaper for external callers.
+**Gas tip:** Use `external` for functions never called internally—cheaper than `public`.
 
 ### State-Modifying Functions
 
@@ -663,6 +705,14 @@ function withdraw(uint256 amount) public {
 ---
 
 ## Part 12: Contract Inheritance
+
+> **When is inheritance used?** Inheritance is **very common** in Solidity for code reuse:
+> - **Token standards**: `ERC20`, `ERC721`, `ERC1155` (OpenZeppelin contracts). Your token inherits from `ERC20` to reuse transfer logic, balance tracking, approvals.
+> - **Access control**: Base contracts like `Ownable` (one owner) or `AccessControl` (role-based) that derived contracts inherit from.
+> - **Upgradeable proxies**: `UUPSUpgradeable`, `TransparentProxy` — derived contracts extend base proxy logic.
+> - **Shared utilities**: Common functions (e.g., `safe math operations`, `event logging`, `validation`) live in base contracts; derived contracts focus on domain logic.
+> 
+> **Rule of thumb**: If you're writing a token, use inheritance. If you're writing access rules, use inheritance. Most real contracts are derived contracts, not base contracts.
 
 Contracts can inherit from other contracts:
 
